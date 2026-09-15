@@ -2,7 +2,7 @@
 
 ## Bu bilgisayardaki doğrulama durumu — 15 Eylül 2026
 
-2.0.5 üretim uygulaması, küçük çevrimiçi kurulum paketi ve WebView2 içeren çevrimdışı kurulum paketi oluşturuldu. Rust üretim derlemesi ile masaüstü köprüsü, kurulum, adımlı lisans merkezi, lisans talebi ve çevrimdışı lisans testleri geçti.
+2.0.6 üretim uygulaması, küçük çevrimiçi kurulum paketi ve WebView2 içeren çevrimdışı kurulum paketi oluşturuldu. Rust üretim derlemesi ile masaüstü köprüsü, kurulum, Windows tipi lisans sihirbazı, kaydırılabilir form alanları, lisans talebi ve çevrimdışı lisans testleri geçti.
 
 Ana dağıtım hedefi Windows masaüstü uygulamasıdır. HTML/CSS/JavaScript arayüzü Tauri paketinin içindedir; **kurulu uygulamada Node.js, PowerShell web sunucusu veya internet gerekmez**. Node.js ve geliştirme sunucusu yalnız geliştirme sırasında kullanılır.
 
@@ -35,7 +35,7 @@ Dağıtım dosyası ayrıca Windows kod imzalama sertifikasıyla imzalanmadığ�
 - Excel/PDF içeriği mevcut çevrimdışı rapor motoruyla oluşturulur; diske yazma Tauri üzerinden yapılır. Dosya boyutu üst sınırı 256 MiB'dir.
 - Tercihler ve son iki proje kurtarma kopyası `%APPDATA%/com.asmach.ballooning/workspace.sqlite3` içinde tutulur. Gerçek veri yolu Windows menüsünde gösterilir. SQLite WAL ve transaction kullanır; ön yüze serbest SQL çalıştırma izni verilmez.
 - JSON proje dosyaları taşınabilir olarak korunur. Önceki tarayıcı sürümündeki projenizi dosyaya kaydedip Tauri'de **Proje aç** ile içeri alın. Tarayıcıya özgü görünüm tercihleri farklı depolama alanından otomatik aktarılmaz.
-- Windows menüsü: başlangıçta açılma (varsayılan kapalı), çıktı klasörü, sistem tepsisine küçültme, güncelleme denetimi.
+- Windows menüsü: başlangıçta açılma (varsayılan kapalı), çıktı klasörü, sistem tepsisine küçültme, imzalı güncelleme denetimi ve doğrulanmış kurulum.
 - PDF, Windows'taki varsayılan PDF uygulamasında açılabilir veya onaydan sonra onun yazdırma işlevine gönderilebilir. PDF okuyucusu ve yazıcı sürücüsü gereklidir; yazdırma sonucu fiziksel yazıcı/okuyucu üzerinden kontrol edilir.
 - OCR modeli, PDF motoru ve rapor varlıkları uygulamaya gömülüdür. Uygulama verileri sunucuya gönderilmez.
 

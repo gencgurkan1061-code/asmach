@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),crypto=re
 
 function requestCode(){
  const pair=crypto.generateKeyPairSync('ec',{namedCurve:'prime256v1'}),jwk=pair.publicKey.export({format:'jwk'}),x=Buffer.from(jwk.x,'base64url'),y=Buffer.from(jwk.y,'base64url'),pub=Buffer.concat([Buffer.from('ECS1'),Buffer.from([32,0,0,0]),x,y]),challenge=crypto.randomBytes(32),deviceId=crypto.createHash('sha256').update(pub).digest('hex'),proof={deviceId,binding:'tpm-cng-v1',publicKey:pub.toString('base64'),challenge:challenge.toString('base64'),signature:crypto.sign('sha256',challenge,{key:pair.privateKey,dsaEncoding:'ieee-p1363'}).toString('base64')};
- const request={version:1,product:'asmach-license-request',requestId:crypto.randomUUID(),deviceId,company:'Test Makina',contact:'test@example.com',note:'Çevrimdışı talep',appVersion:'2.0.5',createdAt:Math.floor(Date.now()/1000),proof};
+ const request={version:1,product:'asmach-license-request',requestId:crypto.randomUUID(),deviceId,company:'Test Makina',contact:'test@example.com',note:'Çevrimdışı talep',appVersion:'2.0.6',createdAt:Math.floor(Date.now()/1000),proof};
  return {request,code:'ASM-REQ1-'+Buffer.from(JSON.stringify(request)).toString('base64url')};
 }
 
