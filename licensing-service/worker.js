@@ -26,8 +26,8 @@ export default {async fetch(request,env){
   if(!semver(current)||!semver(release.version)||versionCompare(current,release.version)>=0||release.target!==target||release.arch!==arch)return new Response(null,{status:204});
   return Response.json({version:release.version,minimumVersion:release.minimumVersion,notes:release.notes||'',pubDate:release.pubDate},{headers:{'Cache-Control':'no-store'}});
  }
- const admin=['/admin/ping','/admin/license','/admin/revoke','/admin/detail','/admin/release'].includes(url.pathname);
- if(request.method!=='POST'||(!admin&&!['/validate','/discover','/discover-challenge','/activate','/ack'].includes(url.pathname)))return new Response('Not found',{status:404});
+ const admin=['/admin/ping','/admin/license','/admin/revoke','/admin/detail','/admin/release','/admin/requests','/admin/request-status'].includes(url.pathname);
+ if(request.method!=='POST'||(!admin&&!['/validate','/discover','/discover-challenge','/activate','/ack','/request-license'].includes(url.pathname)))return new Response('Not found',{status:404});
  if(admin){const expected=env.ADMIN_TOKEN||'',provided=request.headers.get('authorization')||'';const a=new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode('Bearer '+expected))),b=new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(provided)));let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];if(expected.length<32||diff)return new Response('Unauthorized',{status:401});}
  const limit=admin||url.pathname==='/ack'?24000:2048;
  if(Number(request.headers.get('content-length'))>limit)return new Response('Too large',{status:413});
@@ -37,7 +37,7 @@ export default {async fetch(request,env){
  let body;try{const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.length;}body=JSON.parse(new TextDecoder().decode(bytes));}catch{return new Response('Bad JSON',{status:400});}
  if(!body||typeof body!=='object')return new Response('Bad request',{status:400});
  const ok=value=>Response.json({ok:true,...value},{headers:{'Cache-Control':'no-store'}});
- if(url.pathname==='/ack'){
+  if(url.pathname==='/ack'){
   let receipt;
   try{
    if(!env.ADMIN_TOKEN||env.ADMIN_TOKEN.length<32)throw Error();
@@ -82,6 +82,19 @@ export default {async fetch(request,env){
    const record=await response.json(),licenseUpdate=await boundEnvelope(record,env);
    return signed({version:1,product:'asmach-inspection',licenseId:id,deviceId,nonce:ticket.challenge,status:'active',issuedAt:Math.floor(Date.now()/1000),licenseUpdate},env);
   }
+  if(url.pathname==='/request-license'){
+   try{
+    const r=body,p=r.proof||{},time=Math.floor(Date.now()/1000);
+    if(r.version!==1||r.product!=='asmach-license-request'||!/^[a-f0-9-]{36}$/.test(r.requestId||'')||!/^[a-f0-9]{64}$/.test(r.deviceId||'')||typeof r.company!=='string'||r.company.trim().length<2||r.company.length>160||typeof r.contact!=='string'||r.contact.length>200||typeof r.note!=='string'||r.note.length>500||!Number.isSafeInteger(r.createdAt)||r.createdAt<time-2592000||r.createdAt>time+300)throw Error();
+    const pub=from64(p.publicKey||'');if(pub.length!==72||pub[0]!==69||pub[1]!==67||pub[2]!==83||pub[3]!==49||pub[4]!==32||pub[5]||pub[6]||pub[7])throw Error();
+    const id=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pub)),x=>x.toString(16).padStart(2,'0')).join('');if(id!==r.deviceId||p.deviceId!==id||p.binding!=='tpm-cng-v1')throw Error();
+    const challenge=from64(p.challenge||''),signature=from64(p.signature||'');if(challenge.length!==32||signature.length!==64)throw Error();
+    const sec1=new Uint8Array(65);sec1[0]=4;sec1.set(pub.slice(8),1);const key=await crypto.subtle.importKey('raw',sec1,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);if(!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,signature,challenge))throw Error();
+    const priorId=await env.REVOCATIONS.get('license-request-device:'+id),prior=priorId?await env.REVOCATIONS.get('license-request:'+priorId,'json'):null;if(prior&&prior.createdAt>time-300&&prior.status==='new')return ok({requestId:prior.requestId});
+    const clean={version:1,requestId:r.requestId,deviceId:id,company:r.company.trim(),contact:r.contact.trim(),note:r.note.trim(),appVersion:String(r.appVersion||'').slice(0,30),createdAt:r.createdAt,receivedAt:time,status:'new'};
+    await env.REVOCATIONS.put('license-request:'+r.requestId,JSON.stringify(clean),{expirationTtl:7776000});await env.REVOCATIONS.put('license-request-device:'+id,r.requestId,{expirationTtl:7776000});return ok({requestId:r.requestId});
+   }catch{return new Response('Invalid license request',{status:400});}
+  }
   let id=await env.REVOCATIONS.get('device:'+deviceId);
   // Compatibility with licenses published before the device index existed.
   if(!id){const page=await env.REVOCATIONS.list({prefix:'license:',limit:100});if(!page.list_complete)return new Response('Index migration required',{status:503});let latest=null;for(const k of page.keys){const raw=await env.REVOCATIONS.get(k.name);if(!raw)continue;const p=JSON.parse(new TextDecoder().decode(from64(JSON.parse(raw).payload)));if(p.deviceId===deviceId&&p.version===2&&p.binding==='tpm-cng-v1'&&(!latest||p.issuedAt>latest.issuedAt||(p.issuedAt===latest.issuedAt&&p.expiresAt>latest.expiresAt)))latest=p;}id=latest?.licenseId;}
@@ -89,8 +102,10 @@ export default {async fetch(request,env){
   const licenseUpdate=raw&&!revoked?JSON.parse(raw):null;
   return signed({version:1,product:'asmach-inspection',licenseId:id||'',deviceId,nonce:ticket.challenge,status:revoked?'revoked':licenseUpdate?'active':'inactive',issuedAt:Math.floor(Date.now()/1000),...(licenseUpdate?{licenseUpdate}:{})},env);
  }
- if(admin){
-  if(url.pathname==='/admin/ping')return ok({});
+  if(admin){
+   if(url.pathname==='/admin/ping')return ok({});
+   if(url.pathname==='/admin/requests'){const page=await env.REVOCATIONS.list({prefix:'license-request:',limit:100}),requests=[];for(const key of page.keys){const value=await env.REVOCATIONS.get(key.name,'json');if(value)requests.push(value);}requests.sort((a,b)=>b.receivedAt-a.receivedAt);return ok({requests});}
+   if(url.pathname==='/admin/request-status'){const id=String(body.requestId||''),status=String(body.status||'');if(!/^[a-f0-9-]{36}$/.test(id)||!['reviewed','licensed','rejected','delivered'].includes(status))return new Response('Bad request status',{status:400});const key='license-request:'+id,value=await env.REVOCATIONS.get(key,'json');if(!value)return new Response('Request not found',{status:404});value.status=status;value.updatedAt=Math.floor(Date.now()/1000);if(body.licenseId&&/^[a-f0-9-]{36}$/.test(body.licenseId))value.licenseId=body.licenseId;await env.REVOCATIONS.put(key,JSON.stringify(value),{expirationTtl:7776000});return ok({request:value});}
   if(url.pathname==='/admin/release'){
    if(body.release!==undefined){
     const r=body.release||{},version=String(r.version||''),minimumVersion=String(r.minimumVersion||version),target=String(r.target||'windows'),arch=String(r.arch||'x86_64'),notes=String(r.notes||'').slice(0,4000),pubDate=String(r.pubDate||new Date().toISOString());

@@ -155,6 +155,22 @@ fn decode_offline_code(code:&str)->Result<String>{
 pub fn license_offline_activate(state:State<'_,Licensing>,code:String)->Result<Status>{
     install_license(&state,decode_offline_code(&code)?)
 }
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct LicenseRequestResult {submitted:bool,request_id:String,device_id:String,code:String,message:String}
+#[tauri::command]
+pub async fn license_request_create(company:String,contact:String,note:String,consent:bool)->Result<LicenseRequestResult>{
+ if !consent{return Err("Bilgisayar kimliğinin lisans yöneticisine gönderilmesini onaylayın.".into())}
+ let company=company.trim().to_string();let contact=contact.trim().to_string();let note=note.trim().to_string();
+ if company.len()<2||company.len()>160||contact.len()>200||note.len()>500{return Err("Lisans talebi alanlarını kontrol edin.".into())}
+ let identity=crate::tpm::identity(true)?;let request_id=uuid::Uuid::new_v4().to_string();
+ let request=serde_json::json!({"version":1,"product":"asmach-license-request","requestId":request_id,"deviceId":identity.device_id,"company":company,"contact":contact,"note":note,"appVersion":env!("CARGO_PKG_VERSION"),"createdAt":now(),"proof":identity});
+ let bytes=serde_json::to_vec(&request).map_err(err)?;let code=format!("ASM-REQ1-{}",URL_SAFE_NO_PAD.encode(&bytes));
+ let c=config();let base=c.endpoint.trim_end_matches("/validate");let mut submitted=false;
+ if base.starts_with("https://") {if let Ok(client)=http_client(){if let Ok(response)=client.post(format!("{base}/request-license")).json(&request).send().await{submitted=response.status().is_success();}}}
+ let message=if submitted{"Lisans talebiniz yöneticiye gönderildi. Talep kodunu da yedek olarak saklayabilirsiniz."}else{"Talep internete gönderilemedi. Aşağıdaki talep kodunu lisans yöneticinize iletin."}.to_string();
+ Ok(LicenseRequestResult{submitted,request_id,device_id:request["deviceId"].as_str().unwrap_or_default().to_string(),code,message})
+}
 fn install_license(state:&Licensing,text:String)->Result<Status> {
     if text.len()>24_000{return Err("Lisans dosyası çok büyük.".into())}
     let envelope:Envelope=serde_json::from_str(&text).map_err(|_|"Geçerli bir ASMach lisans dosyası seçin.")?;

@@ -14,6 +14,7 @@ function createStore(root){
  if(!db.prepare('PRAGMA table_info(licenses)').all().some(c=>c.name==='user_id'))db.exec('ALTER TABLE licenses ADD COLUMN user_id TEXT');
  if(!db.prepare('PRAGMA table_info(history)').all().some(c=>c.name==='user_id'))db.exec('ALTER TABLE history ADD COLUMN user_id TEXT');
  if(!db.prepare('PRAGMA table_info(licenses)').all().some(c=>c.name==='activation_key'))db.exec("ALTER TABLE licenses ADD COLUMN activation_key TEXT");
+ db.exec("CREATE TABLE IF NOT EXISTS publication(license_id TEXT PRIMARY KEY,revision INTEGER NOT NULL DEFAULT 0,at INTEGER NOT NULL DEFAULT 0,error TEXT NOT NULL DEFAULT '')");
  function userFor(name){const existing=db.prepare('SELECT id FROM users WHERE name=?').get(name);if(existing)return existing.id;const id=crypto.randomUUID();db.prepare('INSERT INTO users(id,name) VALUES(?,?)').run(id,name);return id;}
  const sign=claims=>{const p=Buffer.from(JSON.stringify(claims));return {payload:p.toString('base64'),signature:crypto.sign(null,p,privateKey).toString('base64')};};
  const audit=(id,action,detail)=>db.prepare('INSERT INTO history(license_id,action,at,detail) VALUES(?,?,?,?)').run(id,action,Math.floor(Date.now()/1000),detail);
@@ -48,6 +49,31 @@ function createStore(root){
  function markRevoked(id){record(id);db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE licenses SET cloud_revoked=1,revocation_requested=0 WHERE id=?').run(id);audit(id,'Bulutta iptal edildi','Hizmet iptal kaydını kabul etti. Müşteri başarılı doğrulamada uygular.');db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}}
  function saveLicense(id){const f=exportLicense(id);fs.mkdirSync(exportsDir,{recursive:true});const target=path.join(exportsDir,f.name);if(!fs.existsSync(target))fs.writeFileSync(target,f.text,{flag:'wx'});else if(fs.readFileSync(target,'utf8')!==f.text)throw Error('Aynı isimde farklı bir dosya var; mevcut dosya değiştirilmedi.');audit(id,'Dosya kaydedildi',f.name);return {path:target};}
  function revoke(id){record(id);db.exec('BEGIN IMMEDIATE');try{db.prepare('UPDATE licenses SET revocation_requested=1 WHERE id=?').run(id);audit(id,'İptal talebi','Yalnızca yerel kayıt. Bulut yayını yapılmadı; müşteri lisansı henüz iptal edilmedi.');db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}}
- return {list,detail,updateUser,issue,exportLicense,offlineCode,saveLicense,revoke,amend,markRevoked,publicationRecorded:(id,revision)=>{record(id);audit(id,'Aktif listeye yayımlandı','Revizyon '+revision);},history:()=>db.prepare('SELECT * FROM history ORDER BY id DESC LIMIT 500').all(),revocations:()=>db.prepare('SELECT id FROM licenses WHERE revocation_requested=1').all().map(r=>({key:'revoked:'+r.id,value:'1'})),close:()=>db.close(),exportsDir};
+ function snapshot(){return {format:1,publicKey:pub,licenses:db.prepare('SELECT * FROM licenses ORDER BY id').all(),users:db.prepare('SELECT * FROM users ORDER BY id').all(),history:db.prepare('SELECT * FROM history ORDER BY id').all(),publication:db.prepare('SELECT * FROM publication ORDER BY license_id').all()};}
+ function validateSnapshot(s){
+  if(!s||s.format!==1||s.publicKey!==pub)throw Error('Yedek bu uygulamanın imzalama anahtarıyla uyumlu değil.');
+  for(const key of ['licenses','users','history','publication'])if(!Array.isArray(s[key])||s[key].length>100000)throw Error('Geçersiz yedek tablosu.');
+  const unique=(rows,key)=>{const ids=rows.map(r=>r[key]);if(new Set(ids).size!==ids.length)throw Error('Yedekte yinelenen kayıt var.');return new Set(ids);};
+  const users=unique(s.users,'id'),licenses=unique(s.licenses,'id');unique(s.history,'id');unique(s.publication,'license_id');
+  for(const u of s.users){if(typeof u.id!=='string'||typeof u.name!=='string'||!u.name||typeof u.profile!=='string')throw Error('Geçersiz müşteri kaydı.');const p=JSON.parse(u.profile);if(!p||typeof p!=='object'||Array.isArray(p))throw Error('Geçersiz müşteri profili.');}
+  for(const r of s.licenses){
+   const p=JSON.parse(r.claims),e=JSON.parse(r.envelope);
+   if(!crypto.verify(null,Buffer.from(e.payload,'base64'),crypto.createPublicKey(privateKey),Buffer.from(e.signature,'base64'))||JSON.stringify(JSON.parse(Buffer.from(e.payload,'base64').toString()))!==JSON.stringify(p)||p.licenseId!==r.id||p.product!=='asmach-inspection'||!users.has(r.user_id)||typeof r.note!=='string'||![0,1].includes(r.cloud_revoked)||![0,1].includes(r.revocation_requested)||!(r.activation_key===null||typeof r.activation_key==='string'))throw Error('Yedekte lisans imzası veya kayıt bütünlüğü geçersiz.');
+  }
+  for(const h of s.history)if(!Number.isSafeInteger(h.id)||h.id<1||!Number.isSafeInteger(h.at)||typeof h.action!=='string'||typeof h.detail!=='string'||h.license_id&&!licenses.has(h.license_id)||h.user_id&&!users.has(h.user_id))throw Error('Geçersiz geçmiş kaydı.');
+  for(const p of s.publication)if(!licenses.has(p.license_id)||!Number.isSafeInteger(p.revision)||!Number.isSafeInteger(p.at)||typeof p.error!=='string')throw Error('Geçersiz yayın kaydı.');
+  for(const current of db.prepare('SELECT id,cloud_revoked,revocation_requested FROM licenses WHERE cloud_revoked=1 OR revocation_requested=1').all()){const old=s.licenses.find(r=>r.id===current.id);if(!old||old.cloud_revoked<current.cloud_revoked||old.revocation_requested<current.revocation_requested)throw Error('Bu yedek mevcut iptal durumunu geri alıyor. Güvenlik nedeniyle yüklenemez.');}
+  return {licenses:s.licenses.length,customers:s.users.length,events:s.history.length};
+ }
+ function restoreSnapshot(s){validateSnapshot(s);db.exec('BEGIN IMMEDIATE');try{
+  for(const table of ['publication','history','licenses','users'])db.exec('DELETE FROM '+table);
+  const columns={licenses:['id','claims','envelope','note','renewed_from','revocation_requested','cloud_revoked','user_id','activation_key'],users:['id','name','profile'],history:['id','license_id','action','at','detail','user_id'],publication:['license_id','revision','at','error']};
+  for(const [table,keys] of Object.entries(columns)){const insert=db.prepare('INSERT INTO '+table+' ('+keys.join(',')+') VALUES ('+keys.map(()=>'?').join(',')+')');for(const row of s[table])insert.run(...keys.map(k=>row[k]??null));}
+  db.prepare("UPDATE publication SET revision=0,at=0,error='Yedek geri yüklendi; güncel bulut durumu kontrol edilmeli.'").run();
+  audit('','Yedek geri yüklendi','Uyumlu yedek; imzalama anahtarı ve bulut ayarları korunmuştur. Bulut durumu yeniden kontrol edilmelidir.');db.exec('COMMIT');
+ }catch(e){db.exec('ROLLBACK');throw e;}return {restored:true};}
+ function publicationRecorded(id,revision){record(id);db.prepare("INSERT INTO publication VALUES(?,?,?,'') ON CONFLICT(license_id) DO UPDATE SET revision=excluded.revision,at=excluded.at,error='' ").run(id,revision,Math.floor(Date.now()/1000));audit(id,'Aktif listeye yayımlandı','Revizyon '+revision);}
+ function publicationFailed(id,error){record(id);const message=String(error||'Gönderim başarısız').slice(0,500);db.prepare("INSERT INTO publication VALUES(?,0,0,?) ON CONFLICT(license_id) DO UPDATE SET error=excluded.error").run(id,message);audit(id,'Buluta gönderilemedi',message);}
+ return {list,detail,updateUser,issue,exportLicense,offlineCode,saveLicense,revoke,amend,markRevoked,publicationRecorded,publicationFailed,snapshot,validateSnapshot,restoreSnapshot,publication:()=>db.prepare('SELECT * FROM publication').all(),history:()=>db.prepare('SELECT * FROM history ORDER BY id DESC LIMIT 500').all(),allHistory:()=>db.prepare('SELECT * FROM history ORDER BY id DESC').all(),revocations:()=>db.prepare('SELECT id FROM licenses WHERE revocation_requested=1').all().map(r=>({key:'revoked:'+r.id,value:'1'})),close:()=>db.close(),exportsDir};
 }
 module.exports={createStore};

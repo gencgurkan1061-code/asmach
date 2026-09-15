@@ -307,7 +307,7 @@ fn license_window_stage(app:tauri::AppHandle,stage:String)->Result<()> {
     if saved.finished.load(Ordering::SeqCst){return Ok(())}
     match stage.as_str(){
       "checking"=>{window.show().map_err(err)?;},
-      "entry"=>{window.set_size(tauri::LogicalSize::new(640.,700.)).map_err(err)?;window.center().map_err(err)?;window.show().map_err(err)?;},
+      "entry"=>{window.set_size(tauri::LogicalSize::new(680.,780.)).map_err(err)?;window.center().map_err(err)?;window.show().map_err(err)?;},
       "ready"=>{licensing::require(&app)?;window.set_resizable(true).map_err(err)?;window.set_min_size(Some(tauri::LogicalSize::new(1000.,700.))).map_err(err)?;window.set_size(saved.size).map_err(err)?;window.set_position(saved.position).map_err(err)?;if saved.maximized||!saved.fullscreen{window.maximize().map_err(err)?;}if saved.fullscreen{window.set_fullscreen(true).map_err(err)?;}window.set_title("ASMach Inspection").map_err(err)?;saved.finished.store(true,Ordering::SeqCst);},
       _=>return Err("Geçersiz açılış aşaması".into())
     }Ok(())
@@ -336,7 +336,7 @@ pub fn run() {
           Ok(())
       })
       .on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event {if !window.state::<DesktopState>().allow_close.load(Ordering::SeqCst){api.prevent_close();let _=window.emit("desktop-close-request",());}}})
-      .invoke_handler(tauri::generate_handler![license_window_stage,licensing::license_activate,licensing::license_offline_activate,licensing::license_discover,licensing::license_tpm_identity,licensing::license_status,licensing::license_import,licensing::license_check_online,desktop_bootstrap,preference_set,recovery_get,recovery_put,open_file,choose_save_target,write_target,choose_output_directory,set_autostart,confirm_close,close_application,hide_to_tray,native_pdf,native_excel_open,native_excel_preview,native_template_list,native_template_import,native_template_store,native_template_read,native_template_delete,native_template_editor,check_update])
+      .invoke_handler(tauri::generate_handler![license_window_stage,licensing::license_activate,licensing::license_offline_activate,licensing::license_request_create,licensing::license_discover,licensing::license_tpm_identity,licensing::license_status,licensing::license_import,licensing::license_check_online,desktop_bootstrap,preference_set,recovery_get,recovery_put,open_file,choose_save_target,write_target,choose_output_directory,set_autostart,confirm_close,close_application,hide_to_tray,native_pdf,native_excel_open,native_excel_preview,native_template_list,native_template_import,native_template_store,native_template_read,native_template_delete,native_template_editor,check_update])
       .run(tauri::generate_context!()).expect("ASMach masaüstü uygulaması başlatılamadı");
 }
 

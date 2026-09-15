@@ -1,5 +1,19 @@
 # ASMach Lisans Yönetimi
 
+## Yeni yönetim arayüzü
+
+Sol menü, özet ekranı, müşteri paneli, filtrelenebilir/sayfalı lisans listesi, üç adımlı oluşturma, toplu işlem önizlemesi, ayrı gönderim/cihaz durumları, anahtarsız CSV raporu ve şifreli yedek/geri yükleme eklendi. Açık pencereyi **Çıkış** ile kapatıp aynı yönetici EXE'sini yeniden açın. Müşteri kurulum paketi bu yönetim aracı değildir.
+
+Ayrıntılı kullanım, güvenlik sınırları ve testler: [Yönetim arayüzü notları](../reference/license-manager-workspace.md). Yedek geri yükleme yalnızca mevcut imzalama anahtarıyla uyumlu **kayıtları** geri yükler; anahtar kaybından kurtarma veya başka bilgisayara taşıma işlemi değildir. Bulut ayarları ve dışa aktarılmış lisans dosyaları şifreli kayıt yedeğine dahil değildir; tam klasör yedeği ayrıca korunmalıdır.
+
+Pencere yenilemede oturumun kaybolmaması için açılış anahtarı yalnızca sekmenin oturum deposunda tutulur; kalıcı görünüm tercihlerine yazılmaz. **Çıkış** ile temizlenir. Lisans kodları ancak Göster/Kopyala işlemiyle açılır; kod penceresi kapanınca temizlenir. Yedekteki özel anahtar tarayıcıya yalnız parola ile şifrelenmiş arşiv içinde aktarılır, düz metin olarak gönderilmez.
+
+## Lisans talep kutusu
+
+2.0.4 ve sonraki uygulamalarda kullanıcı **Yöneticiye lisans talebi gönder** seçeneğiyle firma bilgisi ve TPM bilgisayar kimliğini paylaşabilir. Bulut bağlantısı açıksa talep **Lisans talepleri** sayfasında bildirim olarak görünür. Yönetici **Bu talepten lisans oluştur** ile müşteri ve bilgisayar kimliğini doğrudan lisans formuna aktarır.
+
+Güvenlik duvarı isteği engellerse uygulama `ASM-REQ1-...` talep kodu verir. Lisans Yönetimi'ndeki **Talep kodunu içe aktar** işlemi TPM imzasını doğrular ve aynı formu doldurur. Özel lisans imzalama anahtarı bu süreçte buluta gönderilmez.
+
 ## Çevrimdışı süreli etkinleştirme
 
 Müşteri bilgisayarı güvenlik duvarı nedeniyle doğrulama hizmetine ulaşamıyorsa:
@@ -24,7 +38,7 @@ Proje klasöründeki **ASMach Lisans Yönetimi.exe** ile açılır. Yönetim pen
 - Lisans dosyası: bilgisayar kimliğine bağlı kayıtta **Lisans dosyasını indir** veya **Lisans dosyasını kaydet** kullanılabilir. Çevrimiçi ilk-etkinleştirme kaydında bilgisayar henüz belli olmadığı için bu seçenekler açıklamalı olarak kapalıdır.
 - Yeni lisans: müşteri adı, müşterinin uygulamasındaki bilgisayar kimliği ve tarihleri girin. Lisans oluşturulduğunda `Lisanslar` klasörüne kaydedilir.
 - Dosyayı kaydet: mevcut imzalı lisansın aynı kopyasını `Lisanslar` klasörüne kaydeder. İndir: Windows indirme konumuna kopyalar.
-- Yenile: müşteri ve bilgisayar bilgilerini korur; varsayılan olarak mevcut bitiş veya bugün, hangisi ilerideyse, oradan bir yıl uzatır. Tarihi değiştirebilirsiniz. Yeni lisans kimliği oluşturulur; eski kayıt silinmez. Yenileme eski dosyayı müşterinin bilgisayarında kendiliğinden değiştirmez; yeni dosya yüklenmelidir.
+- Yenile / Uzat: müşteri, bilgisayar, etkinleştirme anahtarı ve aynı lisans kimliğini korur; varsayılan olarak mevcut bitiş veya bugün, hangisi ilerideyse, oradan bir yıl uzatır. Tarihi değiştirebilirsiniz. İmzalı revizyon artırılır. Buluta başarılı gönderimden sonra güncel müşteri uygulaması ilk başarılı bağlantısında süreyi alır; tamamen çevrimdışı müşteriye yeni revizyon aktarılmalıdır.
 - Süreyi değiştir: aynı lisans kimliğinin yeni imzalı revizyonunu oluşturur. Önceki tarih ve bilgiler işlem geçmişinde kalır, dosya adı revizyonla ayrılır. Bulut bağlıysa yayımlanır; bağlantı hatasında yerel dosya korunur ve yayımlanmadığı açıkça bildirilir.
 - Bulut ayarları: yayımlanmış Cloudflare Worker adresi ve yönetici anahtarı girilir. Başarılı bağlantı sınamasından sonra kaydedilir. Hesap/servis henüz yayımlanmadıysa çevrimiçi iptal düğmesi kapalı kalır.
 - İnternetten iptal et: hizmet başarılı yanıt verdikten sonra kaydı iptal edildi gösterir. Çevrimdışı müşteriye anında ulaşamaz; müşteri başarılı çevrimiçi doğrulamada kilitlenir. Eski yerel iptal talepleri geçmişte korunur ama kendiliğinden yayımlanmaz.

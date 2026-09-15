@@ -2,7 +2,7 @@
 
 ## Bu bilgisayardaki doğrulama durumu — 15 Eylül 2026
 
-2.0.3 üretim uygulaması, küçük çevrimiçi kurulum paketi ve WebView2 içeren çevrimdışı kurulum paketi oluşturuldu. Rust üretim derlemesi ile masaüstü köprüsü, kurulum ve çevrimdışı lisans testleri geçti.
+2.0.4 üretim uygulaması, küçük çevrimiçi kurulum paketi ve WebView2 içeren çevrimdışı kurulum paketi oluşturuldu. Rust üretim derlemesi ile masaüstü köprüsü, kurulum, lisans talebi ve çevrimdışı lisans testleri geçti.
 
 Ana dağıtım hedefi Windows masaüstü uygulamasıdır. HTML/CSS/JavaScript arayüzü Tauri paketinin içindedir; **kurulu uygulamada Node.js, PowerShell web sunucusu veya internet gerekmez**. Node.js ve geliştirme sunucusu yalnız geliştirme sırasında kullanılır.
 
@@ -47,7 +47,9 @@ R2, otomatik indirme ve uygulama içinden kurulum kullanılmaz. Lisans Yönetici
 
 ## Güvenlik duvarı olan bilgisayarda çevrimdışı lisans
 
-Uygulama çevrimiçi lisans doğrulamasına ulaşamazsa lisans penceresindeki **İnternet yoksa çevrimdışı etkinleştir** bölümü açılır ve TPM tabanlı bilgisayar kimliğini gösterir. Kullanıcı bu kimliği lisans yöneticisine iletir.
+Uygulama çevrimiçi lisans doğrulamasına ulaşamazsa **Lisans merkezi > Çevrimdışı etkinleştirme** bölümü TPM tabanlı bilgisayar kimliğini gösterir. Kullanıcı firma ve iletişim bilgisini girip açık onay verdikten sonra lisans talebini doğrudan gönderebilir. Talep, Lisans Yönetimi uygulamasındaki **Lisans talepleri** kutusuna düşer.
+
+Güvenlik duvarı talep hizmetini de engelliyorsa aynı işlem `ASM-REQ1-...` ile başlayan imzalı bir talep kodu üretir. Yönetici bu kodu **Talep kodunu içe aktar** ile açar. Bilgisayar kimliği ve TPM imzası doğrulanmadan lisans formu doldurulmaz.
 
 Lisans yöneticisinde **TPM · Yeni sürümler** koruması seçilir, bilgisayar kimliği yapıştırılır, başlangıç ve bitiş tarihleri belirlenerek lisans oluşturulur. Lisans satırındaki **Çevrimdışı kod** düğmesiyle üretilen `ASM-OFF1-...` kodu müşteriye iletilir. Kullanıcı kodu uygulamadaki çevrimdışı alana yapıştırıp etkinleştirir.
 
