@@ -1,0 +1,12 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict'),path=require('node:path'),{pathToFileURL}=require('node:url');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const page=await browser.newPage();await page.route(/^https?:/,r=>r.abort());await page.goto(pathToFileURL(path.resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+ const result=await page.evaluate(async()=>{
+  const c=document.createElement('canvas');c.width=340;c.height=90;const g=c.getContext('2d');g.fillStyle='white';g.fillRect(0,0,340,90);g.strokeStyle='black';g.lineWidth=2;g.strokeRect(10,15,320,60);for(const x of [70,260]){g.beginPath();g.moveTo(x,15);g.lineTo(x,75);g.stroke();}g.drawImage(ASMachGdtVision._test.symbolTemplate('concentricity'),16,21,48,48);g.fillStyle='black';g.font='32px Arial';g.fillText('0.1',110,57);g.fillText('A',278,57);
+  const snapshot=c.toDataURL(),normal=await ASMachOCR.recognize(snapshot,{enhancement:'mild'}),preview=await ASMachOCR.recognize(snapshot,{previewPass:'mild'});
+  await ASMachApp.restoreProject({format:'asmach-ballooning-project',source:{name:'gdt-test.png',type:'image/png',dataUrl:snapshot},annotations:[{id:'gdt-test',number:'1',page:1,...ASMachApp.parseRequirement(normal.text),snapshot,selectionBox:{x:0,y:0,w:1,h:1},bubbleX:.5,bubbleY:.5}]});ASMachApp.state.selectedId='gdt-test';ASMachApp.renderAll();await ASMachOcrEnhancement.preview();return{normal,preview};
+ });
+ assert.ok(result.normal.visualGdt,JSON.stringify(result));assert.equal(result.preview.text,result.normal.text);assert.equal(result.normal.gdt.cells[1],'0.1');assert.equal(result.normal.gdt.cells[2],'A');assert.equal(result.normal.gdt.subtype,'concentricity');console.log('PASS actual offline GD&T OCR, shared comparison path, ordered cells:',JSON.stringify(result));
+ await page.waitForFunction(()=>document.querySelectorAll('.ocr-gdt-frame').length===3&&!document.querySelector('#ocrEnhancementPreview>button').disabled);assert.equal(await page.locator('#ocrEnhancementPreview pre').filter({hasText:'Nominal:'}).count(),0);await page.screenshot({path:'outputs/gdt-shared-ocr.png'});await page.evaluate(()=>ASMachOCR.terminate());console.log('PASS three reconstructed GD&T frames; no nominal/general-tolerance fields');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

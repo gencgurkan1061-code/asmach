@@ -1,0 +1,13 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');const assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{const p=await b.newPage();await p.goto(require('url').pathToFileURL(require('path').resolve('ASMach_Teknik_Resim_Balonlama.html')).href);await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=1000;c.height=800;await ASMachApp.restoreProject({format:'asmach-ballooning-project',source:{name:'t.png',type:'image/png',dataUrl:c.toDataURL()},annotations:[]});});
+ await p.locator('#startScreen').waitFor({state:'hidden'});
+ const draft=()=>p.evaluate(()=>{ASMachApp.state.controlledDraft={source:ASMachApp.state.fileData,record:ASMachApp.normalizeAnnotation({id:'draft',number:'1',type:'Uzunluk',nominalValue:'20',unit:'mm',requirement:'20 mm',page:1})};ASMachApp.renderAll();});
+ const outside=()=>p.evaluate(()=>{const el=document.querySelector('.inspector');el.tabIndex=-1;el.focus();});
+ await p.evaluate(()=>{const d=document.createElement('dialog');d.id='hiddenWorkspaceFixture';d.className='wt-panel wt-inactive';d.style.display='none';document.body.append(d);d.show();});
+ await draft();assert.equal(await p.locator('#controlledDraftActions kbd').count(),2);await p.locator('#nominalValue').focus();await p.keyboard.press('Home');await p.keyboard.press('Backspace');assert.equal(await p.evaluate(()=>!!ASMachApp.state.controlledDraft),true);
+ await outside();await p.keyboard.press('Backspace');assert.equal(await p.evaluate(()=>!!ASMachApp.state.controlledDraft),false);
+ await draft();await outside();await p.keyboard.press('Enter');assert.equal(await p.evaluate(()=>!!ASMachApp.state.controlledDraft),false);assert.equal(await p.evaluate(()=>ASMachApp.state.annotations.length),1);
+ await p.evaluate(()=>document.activeElement.blur());await draft();assert.equal(await p.locator('#controlledDraftActions [data-accept]').evaluate(e=>e===document.activeElement),true);await p.keyboard.press('Backspace');assert.equal(await p.evaluate(()=>!!ASMachApp.state.controlledDraft),false);
+ await draft();await p.locator('#controlledDraftActions [data-accept]').click();assert.equal(await p.evaluate(()=>!!ASMachApp.state.controlledDraft),false);
+ console.log('PASS hidden workspace does not block shortcuts, keycaps, Enter/Backspace, automatic focus and mouse confirmation; input deletion preserved');
+}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

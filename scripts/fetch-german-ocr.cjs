@@ -1,0 +1,3 @@
+// Build-time asset import only. No network is used by the delivered application.
+const fs=require('node:fs'),zlib=require('node:zlib'),path=require('node:path');
+(async()=>{const target=path.join(__dirname,'../ocr/lang/deu.traineddata.gz');if(fs.existsSync(target))throw Error('German asset already exists');const response=await fetch('https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/deu.traineddata');if(!response.ok)throw Error('Download failed: '+response.status);const bytes=Buffer.from(await response.arrayBuffer());if(bytes.length<100000)throw Error('Invalid language asset');fs.writeFileSync(target,zlib.gzipSync(bytes));console.log('German language imported:',bytes.length,'bytes');})().catch(e=>{console.error(e);process.exitCode=1;});

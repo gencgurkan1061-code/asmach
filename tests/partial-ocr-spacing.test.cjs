@@ -1,0 +1,12 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx={window:{}};
+for(const name of ['requirements-engine','characteristic-inspector'])vm.runInNewContext(fs.readFileSync('src/'+name+'.js','utf8'),ctx);
+const patch=(type,scope,text)=>JSON.parse(JSON.stringify(ctx.window.ASMachCharacteristicInspector.partialPatch({type},{scope,text})));
+for(const [text,value] of [['2 5 . 4','25.4'],['1 1','11'],['Ø 5 0','50'],['.5','0.5'],['R 1 2 . 5','12.5'],['２５．４','25.4']])assert.deepEqual(patch('Uzunluk','nominal',text),{nominalValue:value});
+assert.deepEqual(patch('Uzunluk','tolerance','± 0 . 0 5'),{lowerTolerance:'-0.05',upperTolerance:'0.05'});
+assert.deepEqual(patch('Uzunluk','tolerance','+ . 0 5 / - . 0 2'),{lowerTolerance:'-0.02',upperTolerance:'0.05'});
+assert.deepEqual(patch('GD&T','tolerance','Ø 0 . 0 0 8'),{upperTolerance:'0.008',lowerTolerance:'0'});
+for(const text of ['20 30','25.4 5','ØO.8','2 5 ±0.1'])assert.throws(()=>patch('Uzunluk','nominal',text));
+assert.throws(()=>patch('GD&T','nominal','25'));
+console.log('PASS 14 partial nominal/tolerance spacing checks; explicit scope, leading decimals, GD&T and unrelated-value guards');

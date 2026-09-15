@@ -1,0 +1,25 @@
+// Offline, real OCR regression. No fixture OCR responses or network services.
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path'),{pathToFileURL}=require('node:url');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{
+const p=await b.newPage();await p.route(/^https?:/,r=>r.abort());await p.goto(pathToFileURL(path.resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+for(const f of ['gdt-vision.js','measurement-layout.js','ocr-image-enhancement.js','ocr-engine.js'])await p.addScriptTag({content:fs.readFileSync('src/'+f,'utf8')});
+const cases=[];for(const kind of ['11','Ø54.9'])for(const scale of [1,.65])for(const mode of ['off','mild','strong'])cases.push({kind,scale,mode,angle:0});
+for(const kind of ['11','Ø54.9'])for(const angle of [90,180,270])cases.push({kind,scale:1,mode:'mild',angle});
+if(process.argv.includes('--rotated'))cases.splice(0,12);
+let correct=0;for(const entry of cases){
+const snapshot=await p.evaluate(({kind,scale,angle})=>{const source=document.createElement('canvas');source.width=200;source.height=90;const ctx=source.getContext('2d');ctx.fillStyle='#efefef';ctx.fillRect(0,0,200,90);ctx.fillStyle='#555';ctx.font='26px Arial';ctx.fillText(kind,16,52);ctx.font='15px Arial';const x=kind==='11'?57:121;ctx.fillText(kind==='11'?'+0.1':'0',x,28);ctx.fillText(kind==='11'?'0':'-0.1',x,65);ctx.strokeStyle='#888';ctx.beginPath();ctx.moveTo(10,76);ctx.lineTo(184,76);ctx.stroke();const c=document.createElement('canvas');c.width=(angle%180?90:200)*scale;c.height=(angle%180?200:90)*scale;const g=c.getContext('2d');if(!angle)g.drawImage(source,0,0,c.width,c.height);else{g.translate(c.width/2,c.height/2);g.rotate(angle*Math.PI/180);g.scale(scale,scale);g.drawImage(source,-100,-45);}return c.toDataURL('image/jpeg',.72);},entry);
+const result=await p.evaluate(async({snapshot,mode})=>{const normal=await ASMachOCR.recognize(snapshot,{enhancement:mode}),preview=await ASMachOCR.recognize(snapshot,{previewPass:mode});return{normal,preview,parsed:ASMachApp.parseRequirement(normal.text)};},{snapshot,mode:entry.mode});
+assert.ok(!result.normal.error,result.normal.error);assert.equal(result.preview.text,result.normal.text,'preview and normal parity');assert.ok(result.preview.previewImage);
+assert.notEqual(String(result.parsed.nominalValue??'').trim(),'','nominal must be present');assert.notEqual(String(result.parsed.lowerTolerance??'').trim(),'','lower tolerance, including zero, must be present');assert.notEqual(String(result.parsed.upperTolerance??'').trim(),'','upper tolerance, including zero, must be present');
+const values=[Number(result.parsed.nominalValue),Number(result.parsed.lowerTolerance),Number(result.parsed.upperTolerance)],expected=entry.kind==='11'?[11,0,.1]:[54.9,-.1,0];
+const ok=values.every((v,i)=>v===expected[i])&&(entry.kind==='11'||result.parsed.type==='Çap');if(ok)correct++;
+console.log(JSON.stringify({...entry,text:result.normal.text,values,ok}));
+assert.deepEqual(values,expected,'nominal / lower / upper '+JSON.stringify(entry));if(entry.kind.startsWith('Ø'))assert.equal(result.parsed.type,'Çap');
+}
+// Plain 0, 8 and B must not become a diameter prefix by the reused visual detector.
+const falsePrefixes=await p.evaluate(()=>['054.9','854.9','B54.9'].map(text=>{const c=document.createElement('canvas');c.width=260;c.height=90;const g=c.getContext('2d');g.fillStyle='white';g.fillRect(0,0,c.width,c.height);g.fillStyle='black';g.font='40px Arial';g.fillText(text,20,60);return ASMachGdtVision._test.zonePrefix(c)?.prefix||'';}));assert.deepEqual(falsePrefixes,['','','']);
+const falseMinus=await p.evaluate(()=>['+0.1','1','0.1'].map(text=>{const c=document.createElement('canvas');c.width=400;c.height=180;const g=c.getContext('2d');g.fillStyle='white';g.fillRect(0,0,c.width,c.height);g.fillStyle='black';g.font='44px Arial';g.fillText('11',32,105);g.font='28px Arial';g.fillText(text,124,55);g.fillText('0',124,140);g.fillRect(15,159,355,2);return ASMachOcrEnhancement.measurementRegions(c).some(r=>r.leadingSign==='-');}));assert.deepEqual(falseMinus,[false,false,false]);
+const boxed=await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=340;c.height=100;const g=c.getContext('2d');g.fillStyle='white';g.fillRect(0,0,c.width,c.height);g.strokeRect(5,5,330,90);g.fillStyle='black';g.font='38px Arial';g.fillText('25.4 ±0.1',30,63);const result=await ASMachOCR.recognize(c.toDataURL(),{enhancement:'mild'});return {gdt:!!result.visualGdt,parsed:ASMachApp.parseRequirement(result.text)};});assert.equal(boxed.gdt,false);assert.equal(Number(boxed.parsed.nominalValue),25.4);
+await p.evaluate(()=>ASMachOCR.terminate());console.log('PASS '+correct+'/'+cases.length+' actual OCR nominal + signed tolerances; preview parity; false Ø prefix negatives.');
+}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,8 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{const p=await b.newPage();await p.goto(require('url').pathToFileURL(require('path').resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=1000;c.height=800;const a=ASMachApp;await a.restoreProject({format:'asmach-ballooning-project',source:{name:'test.png',type:'image/png',dataUrl:c.toDataURL()},annotations:[]});a.state.annotations=[a.normalizeAnnotation({id:'q',number:'27',type:'Pah',page:1})];a.renderAll();await ASMachRepeatedCharacteristics.setQuantity(a,'q',2);});
+for(const show of [false,true,false]){await p.evaluate(show=>{ASMachRepeatedCharacteristics.showBalloons(ASMachApp,'q',show);ASMachRepeatedCharacteristics.groupRows(ASMachApp);},show);
+const rows=p.locator('#balloonTableBody tr[data-id]');assert.equal(await rows.count(),2);assert.equal(await p.locator('[data-repeat-toggle]').count(),0);assert.equal(await p.locator('#balloonTableBody [data-repeat-parent]').count(),0);assert.deepEqual(await rows.locator('.balloon-dot').allTextContents(),['27.1','27.2']);
+const cells=await rows.locator('[data-editable=number]').evaluateAll(es=>es.map(e=>getComputedStyle(e).paddingLeft));assert.equal(cells[0],cells[1]);assert.equal(await p.locator('[title="Tüm alt karakteristikleri göster / gizle"]').isVisible(),false);
+}console.log('PASS flat quantity rows, matching alignment, no expand controls, both balloon modes');}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

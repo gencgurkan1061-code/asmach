@@ -1,0 +1,18 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process'),vm=require('node:vm');
+const root=path.resolve(__dirname,'..'),out=path.join(root,'dist-desktop'),assets=path.join(out,'assets');
+execFileSync(process.execPath,[path.join(__dirname,'build-single.cjs')],{stdio:'pipe'});
+fs.mkdirSync(assets,{recursive:true});
+let html=fs.readFileSync(path.join(root,'ASMach_Teknik_Resim_Balonlama.html'),'utf8');const scripts=[];
+html=html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi,(whole,attributes,code)=>{const type=attributes.match(/\btype\s*=\s*["']([^"']+)["']/i)?.[1];if(type&&!['text/javascript','application/javascript','module'].includes(type))return whole;if(/\bsrc\s*=/.test(attributes))throw Error('Unexpected external script');new vm.Script(code);const file=`assets/script-${String(scripts.length).padStart(3,'0')}.js`;fs.writeFileSync(path.join(out,file),code);scripts.push(file);return '';});
+if(!scripts.length)throw Error('No application scripts found');
+let boot=fs.readFileSync(path.join(root,'src/tauri-bridge.js'),'utf8');
+boot='window.ASMachBrandLogo='+JSON.stringify('data:image/svg+xml;base64,'+fs.readFileSync(path.join(root,'src/assets/asmach-inspection-icon.svg')).toString('base64'))+';\n'+boot;
+boot+='\n'+fs.readFileSync(path.join(root,'src/license-ui.js'),'utf8');
+boot+=`\n(async()=>{try{if(!window.ASMachDesktop)throw Error('Bu paket Tauri masaüstü penceresi içinde çalıştırılmalıdır. npm run desktop:dev kullanın.');await ASMachDesktop.ready;let loaded=0;for(const url of ${JSON.stringify(scripts)})await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=url;s.onload=()=>{ASMachDesktop.license.progress(++loaded,${scripts.length});resolve();};s.onerror=()=>reject(Error('Uygulama bileşeni yüklenemedi: '+url));document.body.append(s);});ASMachDesktop.mount(ASMachApp);await ASMachDesktop.license.complete();}catch(e){try{await window.ASMachDesktop?.license?.fail(e);}catch{}const box=document.createElement('div');box.style.cssText='position:fixed;inset:0;background:white;padding:40px;z-index:99999;color:#843;font:16px Segoe UI';box.textContent='ASMach başlatılamadı: '+(e.message||e);document.body.append(box);}})();`;
+if(process.argv.includes('--dev'))boot+=`\nconst devStream=new EventSource('/__desktop_events');devStream.onmessage=async()=>{if(!window.ASMachApp)return;if(window.ASMachRecovery?.dirty()){if(document.getElementById('nativeReload'))return;const b=document.createElement('button');b.id='nativeReload';b.textContent='Arayüz güncellendi · Kaydettikten sonra yenile';b.style.cssText='position:fixed;top:0;left:35%;z-index:99999;padding:12px;background:#fff3cb';b.onclick=async()=>{if(ASMachRecovery.dirty()){alert('Önce projenizi kaydedin.');return;}await ASMachDesktop.preferences.flush();location.reload();};document.body.append(b);}else{await ASMachDesktop.preferences.flush();location.reload();}};`;
+boot=boot.replace('await ASMachDesktop.ready;','await ASMachDesktop.ready;await ASMachDesktop.license.start();');
+fs.writeFileSync(path.join(out,'native-bootstrap.js'),boot);
+html=html.replace('</body>','<script src="native-bootstrap.js" defer></script></body>');
+fs.writeFileSync(path.join(out,'index.html'),html);
+console.log(`Tauri frontend ready: ${scripts.length} local scripts, no runtime server dependency.`);

@@ -1,0 +1,23 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'),assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+const p=await browser.newPage({viewport:{width:1366,height:1000}});await p.goto(require('url').pathToFileURL(require('path').resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=800;c.height=600;await ASMachApp.restoreProject({format:'asmach-ballooning-project',source:{name:'test.png',type:'image/png',dataUrl:c.toDataURL()},annotations:[{id:'r',number:'1',page:1,type:'Çap',nominalValue:'50',unit:'mm'}]});ASMachApp.state.selectedId='r';ASMachApp.state.metadata.inspectionReport={lotSize:1000};ASMachApp.renderAll();});
+await p.locator('#cwInspectorTab2').click();
+assert.equal(await p.locator('#ipControlPane .ct-save button').count(),0);assert.equal(await p.locator('#ipControlPane .rp-heading').count(),0);
+for(const role of ['operator','quality'])assert.equal(await p.locator('[data-control-group='+role+'] .ct-transfer [data-copy='+role+']').count(),1);
+await p.locator('[data-control-group=operator]>summary').click();
+const field=key=>p.locator('#ipControlPane [data-role=operator][data-key='+key+']');
+await field('enabled').check();assert.ok(await p.locator('.ct-status').first().textContent());
+const method=await field('inspectionMethod').locator('option').nth(1).getAttribute('value');await field('inspectionMethod').selectOption(method);
+assert.equal(await p.evaluate(()=>ASMachApp.state.annotations[0].rolePlans.operator.enabled),true);
+await field('sampleMode').selectOption('table');assert.equal(await field('sampleLevel').locator('option:checked').textContent(),'G2 - P:1000 - N:80');
+await field('sampleLevel').selectOption('G1');assert.equal(await p.evaluate(()=>ASMachApp.state.annotations[0].rolePlans.operator.sampleLevel),'G1');
+await field('sampleMode').selectOption('manual');await field('sampleCount').fill('1001');await field('sampleCount').dispatchEvent('change');assert.notEqual(await p.evaluate(()=>ASMachApp.state.annotations[0].rolePlans.operator.sampleCount),'1001');
+await field('sampleCount').fill('10');await field('sampleCount').dispatchEvent('change');assert.equal(await p.evaluate(()=>ASMachApp.state.annotations[0].rolePlans.operator.sampleCount),'10');
+await field('inspectionFrequency').selectOption('PER_LOT');await p.locator('[data-control-group=operator] .ct-transfer>summary').click();await p.locator('#ipControlPane [data-copy=operator]').click();
+assert.equal(await p.evaluate(()=>ASMachApp.state.annotations[0].rolePlans.quality.sampleCount),'10');
+await p.evaluate(()=>document.getElementById('appSettingsButton').click());await p.locator('#desktopSettings [data-settings-tab=inspection]').click();await p.locator('[data-inspection-tab=sampling]').click();assert.equal(await p.locator('#samplingTableEditor').evaluate(e=>e.tagName),'SECTION');assert.ok(await p.locator('#samplingTableEditor [data-code=A]').isVisible());assert.equal(await p.locator('#samplingTableEditor [data-close]').count(),0);
+await p.locator('#samplingTableEditor [data-code=A]').fill('0');await p.locator('#samplingTableEditor [data-save]').click();assert.match(await p.locator('#samplingTableEditor [data-status]').textContent(),/pozitif/);
+await p.locator('#samplingTableEditor [data-code=A]').fill('4');await p.evaluate(()=>ASMachMessages.confirm=async()=>true);await p.locator('#samplingTableEditor [data-save]').click();await p.waitForFunction(()=>ASMachRolePlans.sizes.A===4);assert.ok(await p.locator('#samplingTableEditor').isVisible());assert.equal(await p.evaluate(()=>JSON.parse(ASMachPreferences.getItem('asmach.sampling-counts.v1')).A),4);
+console.log('PASS auto-save, invalid draft protection, role transfer placement, live sampling labels and settings subtab with validated persistence');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

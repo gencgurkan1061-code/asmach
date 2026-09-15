@@ -1,0 +1,15 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright'),assert=require('node:assert/strict'),fs=require('node:fs');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{const p=await b.newPage({viewport:{width:1200,height:850}});
+await p.setContent('<html><head></head><body><button id="work">Çalışma alanı</button></body></html>');
+await p.evaluate(()=>{window.nativeListeners={};window.__TAURI__={event:{listen:async(name,callback)=>{nativeListeners[name]=callback;return()=>{};}}};});
+await p.evaluate(()=>{window.testState={valid:false,reason:'Bu bilgisayarda lisans yok. Lisans dosyanızı yükleyin.',deviceId:'a'.repeat(64),onlineConfigured:false};window.ASMachDesktop={invoke:async(n,args)=>{if(n==='license_import'){if(args.text!=='valid')throw Error('Lisans imzası geçersiz.');testState={...testState,valid:true,reason:'Lisans geçerli.',license:{customer:'Test Firma',licenseId:'test-id',expiresAt:1900000000}};}return testState;},close:async()=>{window.closedTest=true;}};});
+await p.addScriptTag({content:fs.readFileSync('src/license-ui.js','utf8')});await p.evaluate(()=>{window.entered=false;ASMachDesktop.license.start().then(()=>window.entered=true);});
+await p.locator('#licenseDialog').waitFor();assert.equal(await p.evaluate(()=>entered),false);assert.ok(await p.locator('[data-close]').isHidden());await p.keyboard.press('Escape');assert.ok(await p.locator('#licenseDialog').isVisible());
+await p.locator('#licenseDialog summary').click();await p.locator('[data-text]').fill('bad');await p.locator('[data-import]').click();await p.waitForFunction(()=>document.querySelector('[data-error]').textContent.includes('geçersiz'));
+await p.screenshot({path:'outputs/license-startup.png'});
+await p.locator('[data-text]').fill('valid');await p.locator('[data-import]').click();await p.waitForFunction(()=>entered);assert.equal(await p.locator('#licenseDialog').count(),0);
+await p.evaluate(()=>ASMachDesktop.license.open());assert.ok(await p.locator('[data-close]').isVisible());await p.locator('[data-close]').click();await p.waitForFunction(()=>!document.querySelector('#licenseDialog'));
+await p.evaluate(()=>nativeListeners['license-status-changed']({payload:{...testState,onlineMessage:'Buluta ulaşılamadı. Yerel lisans geçerli.'}}));assert.equal(await p.locator('#licenseDialog').count(),0);
+await p.evaluate(()=>{testState.valid=false;testState.reason='Lisans iptal edildi.';nativeListeners['license-status-changed']({payload:testState});});await p.locator('#licenseDialog').waitFor();assert.ok(await p.locator('[data-close]').isHidden());assert.ok(await p.locator('[data-backup]').isVisible());await p.keyboard.press('Escape');assert.ok(await p.locator('#licenseDialog').isVisible());assert.equal(await p.locator('#work').count(),1);
+console.log('PASS startup gate, Escape, invalid import, valid unlock, settings, runtime expiration, backup access');
+}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

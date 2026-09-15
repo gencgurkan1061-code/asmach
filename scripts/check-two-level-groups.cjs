@@ -1,0 +1,15 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});try{const p=await b.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto(require('url').pathToFileURL(require('path').resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=200;c.height=200;await ASMachApp.restoreProject({format:'asmach-ballooning-project',source:{name:'test.png',type:'image/png',dataUrl:c.toDataURL()},annotations:[{id:'a',number:'17',type:'Çap',classification:'critical'},{id:'b',number:'17.1',type:'Uzunluk',classification:'critical',measurementComponent:'depth',parentCharacteristicId:'a'},{id:'c',number:'18',type:'Uzunluk',classification:'major'},{id:'d',number:'19',type:'Çap',classification:'critical'}].map(r=>({...r,page:1,nominalValue:'5',requirement:'5',unit:'mm'}))});});
+assert.equal(await p.locator('th[data-column=classification]').getAttribute('hidden'),null);
+assert.equal(await p.locator('tr[data-id=a] [data-column=classification]').textContent(),'Kritik');
+await p.selectOption('#lcGrouping','classification');await p.selectOption('#lcGroupingSecondary','type');
+assert.equal(await p.locator('.lc-group[data-level="0"]').count(),2);assert.equal(await p.locator('.lc-group[data-level="1"]').count(),2);
+assert.equal(await p.locator('tr[data-id=a]').evaluate(e=>e.nextElementSibling.dataset.id),'b');
+await p.locator('.lc-group[data-level="0"] button').first().evaluate(e=>e.click());assert.equal(await p.locator('tr[data-id=b]').evaluate(e=>e.hidden),true);
+await p.locator('.lc-group[data-level="0"] button').first().evaluate(e=>e.click());assert.equal(await p.locator('tr[data-id=b]').evaluate(e=>e.hidden),false);
+await p.selectOption('#lcGrouping','type');assert.equal(await p.inputValue('#lcGroupingSecondary'),'');
+await p.selectOption('#lcGroupingSecondary','classification');await p.reload();assert.equal(await p.inputValue('#lcGrouping'),'type');assert.equal(await p.inputValue('#lcGroupingSecondary'),'classification');
+await p.evaluate(()=>ASMachListColumns.reset());assert.equal(await p.locator('th[data-column=classification]').getAttribute('hidden'),null);assert.equal(await p.inputValue('#lcGroupingSecondary'),'');assert.deepEqual(errors,[]);console.log('PASS classification column, two levels, child ownership, collapse, duplicate prevention, persistence and reset');
+}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1});

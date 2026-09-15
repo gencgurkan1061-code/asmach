@@ -1,0 +1,4 @@
+const fs=require('node:fs');let fixture=fs.readFileSync('scripts/check-characteristic-info.cjs','utf8').split('\n').slice(0,4).join('\n');
+fixture+=`
+for(const shape of ['circle','square','hexagon']){await p.evaluate(shape=>{const r=ASMachApp.selectedAnnotation();r.shape=shape;ASMachApp.renderAll();},shape);const ring=p.locator('.selected-ring');assert.equal(await ring.count(),1);assert.equal(await ring.locator('[vector-effect="non-scaling-stroke"]').count(),3);assert.equal(await ring.getAttribute('pointer-events'),'none');}await p.screenshot({path:'outputs/selected-balloon-effect.png'});await p.emulateMedia({media:'print'});assert.equal(await p.locator('.selected-ring').isVisible(),false);assert.deepEqual(errors,[]);console.log('PASS selection highlight, fixed-width strokes and print exclusion');
+}finally{await b.close();}})().catch(e=>{console.error(e);process.exitCode=1;});`;eval(fixture);

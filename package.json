@@ -1,0 +1,17 @@
+{
+  "name": "asmach-ballooning-desktop",
+  "version": "2.0.3",
+  "private": true,
+  "description": "Offline Windows technical drawing ballooning application",
+  "scripts": {
+    "desktop:prepare": "node scripts/build-desktop.cjs",
+    "desktop:preview": "node scripts/desktop-dev.cjs",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build --bundles nsis",
+    "desktop:build:offline": "tauri build --bundles nsis --config src-tauri/tauri.offline.conf.json",
+    "desktop:build:store": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-store-msix.ps1",
+    "tauri": "tauri",
+    "test:desktop": "node --test tests/tauri-bridge.test.cjs"
+  },
+  "devDependencies": { "@tauri-apps/cli": "^2.0.0" }
+}

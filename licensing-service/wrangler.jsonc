@@ -1,0 +1,11 @@
+{
+  "name": "asmach-license",
+  "account_id": "e8a1e7d920b34d915a8b201d6c6fa6a9",
+  "workers_dev": true,
+  "main": "worker.js",
+  "compatibility_date": "2026-09-01",
+  "durable_objects": {"bindings":[{"name":"ACTIVATIONS","class_name":"LicenseActivation"}]},
+  "migrations": [{"tag":"activation-v1","new_sqlite_classes":["LicenseActivation"]}],
+  "vars": {"LICENSE_PUBLIC_KEY":"/XL1SAUWuGJol1Ww+IVlSETOetvZwgBniGyqCLowyC8="},
+  "kv_namespaces": [{"binding":"REVOCATIONS","id":"6502fe15c1b548e2928d4ae7ae63403b"}]
+}

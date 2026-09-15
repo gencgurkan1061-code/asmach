@@ -1,0 +1,6 @@
+{
+  "licensePublicKey": "/XL1SAUWuGJol1Ww+IVlSETOetvZwgBniGyqCLowyC8=",
+  "statusPublicKey": "4f30O2U0DWY7vLq6oQSHMhQhHCL6gJJ4G5uUK8yr1Cc=",
+  "endpoint": "https://asmach-license.licensing-service.workers.dev/validate",
+  "requireTpm": true
+}

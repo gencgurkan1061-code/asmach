@@ -1,0 +1,20 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {pathToFileURL}=require('node:url'),path=require('node:path'),assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+const page=await browser.newPage({viewport:{width:1366,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route(/^https?:/,r=>r.abort());
+await page.goto(pathToFileURL(path.resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+await page.waitForFunction(()=>window.ASMachApp);
+await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=1000;c.height=700;const g=c.getContext('2d');g.fillStyle='white';g.fillRect(0,0,1000,700);g.fillStyle='black';g.font='30px Arial';g.fillText('20 ±0.1',300,250);
+await ASMachApp.restoreProject({format:'asmach-ballooning-project',source:{name:'scan.png',type:'image/png',dataUrl:c.toDataURL()},annotations:[]});
+window.ASMachAutoSelection=null;window.ASMachDiameterVision=null;window.ASMachGdtVision=null;window.ASMachOCR={...ASMachOCR,recognize:async()=>({text:'20 ±0.1',confidence:95,source:'Test OCR'})};
+window.modalOpened=false;new MutationObserver(()=>{if(document.querySelector('#ocrReviewModal').classList.contains('is-visible'))window.modalOpened=true;}).observe(document.querySelector('#ocrReviewModal'),{attributes:true,attributeFilter:['class']});
+});
+async function scan(mode){await page.locator('[data-for="boxScanMode"][data-choice="'+mode+'"]').click();const b=await page.locator('#overlay').boundingBox();await page.mouse.move(b.x+b.width*.28,b.y+b.height*.28);await page.mouse.down();await page.mouse.move(b.x+b.width*.5,b.y+b.height*.4,{steps:5});await page.mouse.up();}
+await scan('smart');await page.waitForFunction(()=>ASMachApp.state.annotations.length===1);assert.equal(await page.evaluate(()=>window.modalOpened),false);assert.equal(await page.evaluate(()=>ASMachApp.state.annotations[0].nominalValue),'20');
+await scan('controlled');await page.locator('#ocrReviewModal.is-visible').waitFor();assert.equal(await page.evaluate(()=>ASMachApp.state.annotations.length),1);await page.locator('#ocrReviewConfirmButton').click();await page.waitForFunction(()=>ASMachApp.state.annotations.length===2);
+await page.evaluate(()=>{window.ASMachOCR={...ASMachOCR,recognize:async()=>({text:'',confidence:0,error:'Unreadable'})};});await scan('smart');await page.waitForFunction(()=>!document.querySelector('#busyLayer').classList.contains('is-visible'));assert.equal(await page.evaluate(()=>ASMachApp.state.annotations.length),2);assert.equal(await page.locator('#ocrReviewModal').isVisible(),false);
+await page.evaluate(()=>{window.noteText='3. TÜM KESKİN KENARLARI 0.5 mm KIRIN';window.ASMachOCR={...ASMachOCR,recognize:async(s,o)=>{window.noteOptions=o;return {text:noteText,confidence:95,source:'Test OCR'};}};});
+await page.locator('[data-for="boxContentMode"][data-choice="note"]').click();await scan('smart');await page.waitForFunction(()=>ASMachApp.state.annotations.length===3);const note=await page.evaluate(()=>ASMachApp.state.annotations[2]);assert.equal(note.type,'Not');assert.equal(note.requirement,'3. TÜM KESKİN KENARLARI 0.5 mm KIRIN');assert.equal(note.nominalValue,'');assert.equal(note.lowerTolerance,'');assert.equal(note.toleranceStandard,'');assert.equal(await page.evaluate(()=>noteOptions.textMode),true);
+await scan('controlled');await page.locator('#ocrReviewModal.is-visible').waitFor();assert.equal(await page.locator('#ocrCharacteristicType').inputValue(),'Not');assert.equal(await page.locator('#ocrNominal').isVisible(),false);await page.locator('#ocrReviewConfirmButton').click();await page.waitForFunction(()=>ASMachApp.state.annotations.length===4);
+assert.deepEqual(errors,[]);console.log('PASS: smart and controlled dimensions and notes; note numbers remain text, no tolerances, text OCR requested.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="ASMach Inspection">
+<rect width="512" height="512" rx="32" fill="#03224e"/>
+<defs>
+<linearGradient id="ring" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#12d5ef"/><stop offset=".52" stop-color="#00a9ff"/><stop offset="1" stop-color="#064cdd"/></linearGradient>
+<linearGradient id="plate" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#fff"/><stop offset=".55" stop-color="#f2f7fb"/><stop offset="1" stop-color="#c5d9e8"/></linearGradient>
+<linearGradient id="tick" x1=".9" y1="0" x2=".2" y2="1"><stop stop-color="#25d9f1"/><stop offset=".52" stop-color="#008fff"/><stop offset="1" stop-color="#00396d"/></linearGradient>
+</defs>
+<g transform="translate(8 12)">
+<path d="M216 56 A176 176 0 0 0 52 220 M260 56 A176 176 0 0 1 368 106 M395 128 A176 176 0 0 1 424 220 M424 258 A176 176 0 0 1 260 410 M216 410 A176 176 0 0 1 52 258" fill="none" stroke="url(#ring)" stroke-width="26"/>
+<path d="M215 124 Q240 98 265 124 L354 213 Q384 242 354 272 L269 358 Q240 384 211 356 L124 270 Q95 241 124 212Z" fill="url(#plate)" transform="translate(0 -6) scale(1 .96)"/>
+<path d="M153 221 L187 191 L228 229 L405 90 L230 298Z" fill="url(#tick)"/>
+<path d="M238 18V94 M238 368V444 M20 233H99 M376 233H455" fill="none" stroke="#fff" stroke-width="17"/>
+</g>
+</svg>

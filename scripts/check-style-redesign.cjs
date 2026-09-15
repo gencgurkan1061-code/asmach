@@ -1,0 +1,6 @@
+// Reuse the behavior fixture and additionally verify the replacement workspace layout.
+const fs=require('node:fs');
+let source=fs.readFileSync('scripts/check-balloon-fill-arrow.cjs','utf8');
+source=source.replace("await p.locator('#settingsSaveButton').click();",`for(const width of [1900,1100,760]){await p.setViewportSize({width,height:950});const geometry=await p.locator('.sw-shell').evaluate(e=>({overflow:e.scrollWidth>e.clientWidth,footer:document.getElementById('settingsSaveButton').getBoundingClientRect().bottom,lines:[...e.querySelectorAll('.appearance-component-line')].map(n=>getComputedStyle(n).gridColumn)}));assert.equal(geometry.overflow,false);assert.ok(geometry.footer<=950&&geometry.footer>880);assert.ok(geometry.lines.every(v=>v==='1 / -1'));}
+await p.setViewportSize({width:1500,height:950});await p.locator('[data-style-area=classes]').click();await p.locator('#classificationManager').waitFor({state:'visible'});await p.locator('[data-style-area=styles]').click();await p.locator('.appearance-nav button').nth(1).click();assert.equal(await p.locator('.appearance-manager>.ra-previews').count(),1);await p.locator('.appearance-nav button').first().click();await p.screenshot({path:'outputs/style-workspace-redesign.png'});await p.locator('#settingsSaveButton').click();`);
+eval(source);

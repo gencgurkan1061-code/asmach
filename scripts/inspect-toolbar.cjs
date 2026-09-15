@@ -1,0 +1,3 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {pathToFileURL}=require('node:url'),path=require('node:path');
+(async()=>{const b=await chromium.launch({channel:'msedge',headless:true});const p=await b.newPage({viewport:{width:1592,height:900}});await p.route(/^https?:/,r=>r.abort());await p.goto(pathToFileURL(path.resolve('ASMach_Teknik_Resim_Balonlama.html')).href);await p.locator('#balloonSettingsButton').scrollIntoViewIfNeeded();console.log(await p.locator('#balloonSettingsButton').boundingBox());await p.screenshot({path:'outputs/safety-review-qa/debug-tools.png'});await b.close();})();

@@ -1,0 +1,15 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {pathToFileURL}=require('node:url'),path=require('node:path'),fs=require('node:fs'),assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const page=await browser.newPage({viewport:{width:1366,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route(/^https?:/,r=>r.abort());await page.goto(pathToFileURL(path.resolve('ASMach_Teknik_Resim_Balonlama.html')).href);await page.locator('#appSettingsButton').waitFor();
+ const original=await page.evaluate(()=>JSON.stringify(ASMachApp.state.annotations));
+ await page.locator('#appSettingsButton').click();const d=page.locator('#desktopSettings');
+ await d.locator('[data-pref=accent]').selectOption('blue');assert.equal(await page.getAttribute('html','data-desktop-accent'),'blue');await d.locator('[data-cancel]').last().click();assert.equal(await page.getAttribute('html','data-desktop-accent'),'teal');
+ await page.locator('#appSettingsButton').click();await d.locator('[data-pref=accent]').selectOption('violet');await d.locator('[data-pref=background]').selectOption('dark');await d.locator('[data-pref=shortcuts]').uncheck();await d.locator('[data-save]').click();await page.reload();await page.locator('#appSettingsButton').waitFor();assert.equal(await page.getAttribute('html','data-desktop-accent'),'violet');
+ await page.locator('#appSettingsButton').click();await d.locator('[data-reset]').click();await page.keyboard.press('Escape');assert.equal(await page.getAttribute('html','data-desktop-accent'),'violet');assert.equal(await d.isVisible(),false);
+ fs.mkdirSync('outputs/desktop-ui-qa',{recursive:true});
+ for(const size of [{width:1366,height:900},{width:900,height:600},{width:390,height:844}]){await page.setViewportSize(size);await page.locator('#appSettingsButton').click();const b=await d.boundingBox();assert.ok(b.x>=0&&b.y>=0&&b.x+b.width<=size.width+1&&b.y+b.height<=size.height+1);assert.ok(await d.locator('[data-save]').isVisible());assert.equal(await d.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);await page.screenshot({path:`outputs/desktop-ui-qa/settings-${size.width}.png`});await d.locator('[data-cancel]').last().click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
+ await page.setViewportSize({width:1366,height:900});await page.screenshot({path:'outputs/desktop-ui-qa/command-bars.png'});
+ assert.equal(await page.locator('.wl-appbar #appSettingsButton').count(),1);assert.equal(await page.locator('.wl-main #autoDetectButton').count(),1);
+ assert.equal(await page.evaluate(()=>JSON.stringify(ASMachApp.state.annotations)),original);assert.deepEqual(errors,[]);console.log('Desktop UI passed: preview, cancel, save/reload, reset/Escape, responsive bounds, separate command bars, data isolation, no runtime errors.');
+ }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

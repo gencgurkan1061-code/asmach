@@ -1,0 +1,20 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await browser.newPage({viewport:{width:1400,height:900}});await p.goto(require('url').pathToFileURL(require('path').resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+ await p.evaluate(()=>{const raw=document.getElementById('ciOcrText'),label=raw.closest('[role=group]');const host=document.createElement('div');host.style='position:fixed;inset:100px auto auto 100px;width:350px;z-index:99999;background:white';host.append(label);document.body.append(host);});
+ await p.locator('.gt-rich').filter({visible:true}).first().click();assert.equal(await p.locator('.gt-palette[open]').count(),0);
+ await p.evaluate(()=>{const raw=document.getElementById('ciOcrText');raw.hidden=false;raw.value='501';raw.focus();raw.setSelectionRange(2,2);});
+ await p.locator('.gt-symbol-button').filter({visible:true}).first().click();await p.locator('.gt-palette button[aria-label="±"]').click();
+ assert.equal(await p.locator('#ciOcrText').inputValue(),'50±1');assert.equal(await p.locator('.gt-palette [data-cell]').isDisabled(),true);
+ await p.locator('#ciOcrText').click();await p.keyboard.press('Home');await p.locator('.gt-palette button[aria-label="Ø"]').click();assert.equal(await p.locator('#ciOcrText').inputValue(),'Ø50±1');assert.equal(await p.locator('.gt-palette').isVisible(),true);
+ await p.locator('.gt-palette [data-boxed]').check();assert.equal(await p.locator('.gt-palette [data-boxed]').isChecked(),true);await p.locator('.gt-palette [data-close]').click();
+ assert.equal(await p.locator('[data-cell-action]:not(:disabled)').count(),0);
+ await p.locator('.gt-symbol-button').filter({visible:true}).first().click();assert.equal(await p.locator('.gt-palette').evaluate(e=>e.matches(':modal')),false);
+ const before=await p.locator('.gt-palette').boundingBox();assert.ok(before.width<=360);const header=await p.locator('.gt-palette>header').boundingBox();await p.mouse.move(header.x+35,header.y+12);await p.mouse.down();await p.mouse.move(header.x+135,header.y+72,{steps:5});await p.mouse.up();const after=await p.locator('.gt-palette').boundingBox();assert.ok(after.x>before.x+90);assert.ok(after.y>before.y+50);
+ await p.locator('.gt-palette [data-close]').click();assert.equal(await p.locator('.gt-palette[open]').count(),0);
+ await p.locator('.gt-rich').filter({visible:true}).first().click();assert.equal(await p.locator('.gt-palette[open]').count(),0);
+ const result=await p.evaluate(async()=>{const r={id:'test',number:'1',type:'Diş',unit:'mm',nominalValue:'50',threadClass:'6H',threadPitch:'1',fitClass:'H7',lowerTolerance:'',upperTolerance:'',lowerLimit:'',upperLimit:'',requirementMode:'auto'};ASMachMessages.confirm=async()=>true;const app={state:{fileData:'test'},selectedAnnotation:()=>r,renderAll(){},checkpoint(){},recordChange(){}};await ASMachCharacteristicEditing.confirmCorrection(app,r,{type:'Çap'});const applied=ASMachCharacteristicEditing.general(r,'ISO 2768-mK',()=>({lowerTolerance:'-0.3',upperTolerance:'0.3',lowerLimit:'49.7',upperLimit:'50.3'}),0,true);return{r,applied,blocked:ASMachCharacteristicEditing.general({...r,type:'Diş'},'ISO 2768-mK',()=>({}),0,true)};});
+ assert.equal(result.r.type,'Çap');assert.equal(result.r.threadClass,'');assert.equal(result.r.fitClass,'');assert.ok(result.applied.patch);assert.ok(result.blocked.reason);
+ console.log('PASS rich-text click does not open symbols; palette closes; type conversion clears stale classes and permits general tolerance');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

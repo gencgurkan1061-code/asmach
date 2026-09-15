@@ -1,0 +1,17 @@
+node_modules/
+.runtime/
+.tools/
+dist-desktop/
+src-tauri/target/
+src-tauri/gen/
+outputs/
+tmp/
+*.log
+*.key
+*.pfx
+*.p12
+.license-admin/
+*.asmach-license
+license-manager/runtime/
+ASMach Lisans Yönetimi.exe
+.wrangler/

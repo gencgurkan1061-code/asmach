@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+
+  <text x="18" y="39"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="21"
+        font-weight="700"
+        fill="#111">##</text>
+
+  <rect x="31" y="13" width="29" height="38" rx="3"
+        fill="#D9F5FF" stroke="#087F9C" stroke-width="2.2"/>
+
+  <text x="45.5" y="27"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="10"
+        font-weight="700"
+        fill="#111">+#.##</text>
+
+  <text x="45.5" y="41"
+        text-anchor="middle"
+        font-family="Arial,sans-serif"
+        font-size="10"
+        font-weight="700"
+        fill="#111">−#.##</text>
+
+</svg>

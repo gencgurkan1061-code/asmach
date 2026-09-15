@@ -1,0 +1,21 @@
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const {pathToFileURL}=require('node:url'),path=require('node:path'),assert=require('node:assert/strict');
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await browser.newPage({viewport:{width:1600,height:950}}),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.route(/^https?:/,r=>r.abort());await p.goto(pathToFileURL(path.resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+ await p.evaluate(async()=>{const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=700;const g=canvas.getContext('2d');g.fillStyle='white';g.fillRect(0,0,1000,700);const source=canvas.toDataURL();await ASMachApp.restoreProject({format:'asmach-ballooning-project',source:{name:'numbering.png',type:'image/png',dataUrl:source},annotations:[{id:'existing',number:1,page:1,type:'Uzunluk',nominalValue:'50',selectionBox:{x:.7,y:.7,w:.1,h:.04},bubbleX:.8,bubbleY:.65}],pendingCandidates:[[.5,.1],[.1,.4],[.1,.1]].map(([x,y],i)=>({selected:true,page:1,box:{x,y,w:.12,h:.04},text:(20+i)+' ±0.1',parsed:ASMachApp.parseRequirement((20+i)+' ±0.1'),snapshot:source,confidence:95,plan:{inspectionMethod:ASMachApp.getMethods()[0].value,inspectionFrequency:'EACH_PART'}}))});window.ASMachAutomaticGeometry={...ASMachAutomaticGeometry,place:()=>true};});
+ await p.locator('#autoDetectButton').click();
+ const numbers=()=>p.locator('#wfRows tr[data-index] td[data-column=number]').allTextContents();
+ assert.deepEqual(await numbers(),['→ #3','→ #4','→ #2']);
+ assert.equal(await p.locator('#wfNumberOrder').isVisible(),true);
+ await p.locator('#wfNumberOrder').selectOption('clockwise');assert.deepEqual((await numbers()).sort(),['→ #2','→ #3','→ #4']);
+ await p.locator('#wfNumberOrder').selectOption('columns');assert.deepEqual(await numbers(),['→ #4','→ #3','→ #2']);
+ await p.locator('#wfRows tr[data-index="0"] input[type=checkbox]').uncheck();assert.deepEqual(await numbers(),['—','→ #3','→ #2']);
+ await p.locator('#wfRows tr[data-index="0"] input[type=checkbox]').check();
+ await p.locator('#wfRows tr[data-index="2"] td[data-column=requirement]').click();
+const marks=await p.locator('.wf-inline-source canvas').getAttribute('data-balloon-numbers');assert.deepEqual(JSON.parse(marks).map(Number).sort(),[1,2,3,4]);
+ await p.locator('#wfAccept').click();
+ assert.deepEqual(await p.evaluate(()=>ASMachApp.state.annotations.map(a=>[Number(a.number),Number(a.nominalValue)])),[[1,50],[4,20],[3,21],[2,22]]);
+ await p.locator('#wfShowAdded').click();await p.locator('#wfRows tr[data-index]').first().click();
+ assert.deepEqual(JSON.parse(await p.locator('.wf-inline-source canvas').getAttribute('data-balloon-numbers')).map(Number).sort(),[1,2,3,4]);
+ assert.deepEqual(errors,[]);console.log('PASS: direction, reserved numbers, selection, all preview balloons, exact committed numbers.');
+ }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
