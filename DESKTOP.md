@@ -2,7 +2,7 @@
 
 ## Bu bilgisayardaki doğrulama durumu — 15 Eylül 2026
 
-2.0.4 üretim uygulaması, küçük çevrimiçi kurulum paketi ve WebView2 içeren çevrimdışı kurulum paketi oluşturuldu. Rust üretim derlemesi ile masaüstü köprüsü, kurulum, lisans talebi ve çevrimdışı lisans testleri geçti.
+2.0.5 üretim uygulaması, küçük çevrimiçi kurulum paketi ve WebView2 içeren çevrimdışı kurulum paketi oluşturuldu. Rust üretim derlemesi ile masaüstü köprüsü, kurulum, adımlı lisans merkezi, lisans talebi ve çevrimdışı lisans testleri geçti.
 
 Ana dağıtım hedefi Windows masaüstü uygulamasıdır. HTML/CSS/JavaScript arayüzü Tauri paketinin içindedir; **kurulu uygulamada Node.js, PowerShell web sunucusu veya internet gerekmez**. Node.js ve geliştirme sunucusu yalnız geliştirme sırasında kullanılır.
 

@@ -166,9 +166,9 @@ pub async fn license_request_create(company:String,contact:String,note:String,co
  let identity=crate::tpm::identity(true)?;let request_id=uuid::Uuid::new_v4().to_string();
  let request=serde_json::json!({"version":1,"product":"asmach-license-request","requestId":request_id,"deviceId":identity.device_id,"company":company,"contact":contact,"note":note,"appVersion":env!("CARGO_PKG_VERSION"),"createdAt":now(),"proof":identity});
  let bytes=serde_json::to_vec(&request).map_err(err)?;let code=format!("ASM-REQ1-{}",URL_SAFE_NO_PAD.encode(&bytes));
- let c=config();let base=c.endpoint.trim_end_matches("/validate");let mut submitted=false;
- if base.starts_with("https://") {if let Ok(client)=http_client(){if let Ok(response)=client.post(format!("{base}/request-license")).json(&request).send().await{submitted=response.status().is_success();}}}
- let message=if submitted{"Lisans talebiniz yöneticiye gönderildi. Talep kodunu da yedek olarak saklayabilirsiniz."}else{"Talep internete gönderilemedi. Aşağıdaki talep kodunu lisans yöneticinize iletin."}.to_string();
+ let c=config();let base=c.endpoint.trim_end_matches("/validate");let mut submitted=false;let mut failure="İnternet bağlantısı kurulamadı.".to_string();
+ if base.starts_with("https://") {match http_client(){Ok(client)=>match client.post(format!("{base}/request-license")).json(&request).send().await{Ok(response)=>{submitted=response.status().is_success();if !submitted{failure=match response.status().as_u16(){400=>"Talep bilgileri hizmet tarafından doğrulanamadı.",413=>"Talep bilgileri izin verilen boyutu aştı.",429=>"Kısa sürede çok fazla talep gönderildi.",_=>"Lisans talebi hizmeti şu anda yanıt vermiyor."}.into();}},Err(_)=>failure="Güvenlik duvarı veya internet bağlantısı talebi engelledi.".into()},Err(_)=>failure="Güvenli internet bağlantısı hazırlanamadı.".into()}}
+ let message=if submitted{"Lisans talebiniz yöneticiye gönderildi. Talep kodunu da yedek olarak saklayabilirsiniz.".to_string()}else{format!("{failure} Yedek talep kodunu lisans yöneticinize iletin.")};
  Ok(LicenseRequestResult{submitted,request_id,device_id:request["deviceId"].as_str().unwrap_or_default().to_string(),code,message})
 }
 fn install_license(state:&Licensing,text:String)->Result<Status> {

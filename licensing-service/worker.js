@@ -29,7 +29,7 @@ export default {async fetch(request,env){
  const admin=['/admin/ping','/admin/license','/admin/revoke','/admin/detail','/admin/release','/admin/requests','/admin/request-status'].includes(url.pathname);
  if(request.method!=='POST'||(!admin&&!['/validate','/discover','/discover-challenge','/activate','/ack','/request-license'].includes(url.pathname)))return new Response('Not found',{status:404});
  if(admin){const expected=env.ADMIN_TOKEN||'',provided=request.headers.get('authorization')||'';const a=new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode('Bearer '+expected))),b=new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(provided)));let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];if(expected.length<32||diff)return new Response('Unauthorized',{status:401});}
- const limit=admin||url.pathname==='/ack'?24000:2048;
+ const limit=admin||url.pathname==='/ack'?24000:url.pathname==='/request-license'?8192:2048;
  if(Number(request.headers.get('content-length'))>limit)return new Response('Too large',{status:413});
  // Bound streamed input too: content-length is not trusted.
  const reader=request.body?.getReader();if(!reader)return new Response('Bad request',{status:400});let chunks=[],size=0;
