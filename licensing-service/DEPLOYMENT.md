@@ -1,5 +1,17 @@
 # Canlı lisans hizmeti
 
+## 16 Eylül 2026 güncellemesi
+
+Lisans süresi uzatıldıktan sonra aynı anahtarla yeniden giriş ve otomatik çevrimiçi doğrulama için `asmach-license` Worker'ı tekrar yayımlandı (sürüm kimliği `d1e27c1c-935e-4ed1-a356-ecebbf805f3e`). TPM çevrimdışı izinli lisanslarda yenilenen süre, doğrulanmış TPM kanıtıyla en fazla 90 gün ve lisans bitişi sınırında yeniden hesaplanır. 3.0.7 kurulum paketi istemcideki yenileme ve görünür hata düzeltmelerini içerir; kurulum paketi `asmach-release` hizmetine yüklenmedi.
+
+16 Eylül 2026 kontrolünde canlı `asmach-license` hizmeti `/offline-enable` isteğine 404 verdi; yeni akış henüz yayında değil. Bu durumda 3.0.5 istemcisi çevrimiçi anahtarı eski hizmette etkinleştirse bile eski hizmet TPM/çevrimiçi anahtar ayrımını imzalı yanıta koymaz. Uygulama bunu "Lisans bu bilgisayara veya ürüne ait değil" hatası olarak gösterebilir. `activation.js` eski hizmetin önceden kaydettiği aynı cihaz kimliğini, yeni hizmete geçildikten sonra anahtar tekrar girildiğinde doğrulanmış cihaz imzasıyla güvenli biçimde tamamlayacak şekilde güncellendi. Kimlik farklıysa aktarım yapılmaz.
+
+`worker.js` ve `activation.js` birlikte `asmach-license` hizmetine 16 Eylül 2026'da Wrangler ile yayımlandı (sürüm kimliği `b25784ec-c637-4494-b1c9-1d386d20e526`). Canlı `/offline-enable` yoklama isteği artık eski 404 yerine beklenen 400 `Bad device` yanıtını veriyor. `asmach-release` değiştirilmedi. Kullanıcı aynı lisans anahtarını tekrar girebilir; canlı kayıtlarda elle sıfırlama yapmayın.
+
+Worker kodu TPM'siz çevrimiçi etkinleştirme ve isteğe bağlı 90 günlük TPM çevrimdışı iznini destekler. `asmach-release` yalnızca kurulum/güncelleme dağıtımı içindir ve lisans Worker'ının yerine geçmez.
+
+90 günlük izin, lisansın kendi bitiş tarihini aşmaz. Lisans Yönetimi'ndeki TPM alanları cihaz başarılı doğrulama yaptıktan sonra dolar.
+
 - Yayın tarihi: 12 Eylül 2026
 - Hizmet: https://asmach-license.licensing-service.workers.dev
 - Doğrulama: `/validate`

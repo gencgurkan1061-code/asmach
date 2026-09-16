@@ -5,7 +5,7 @@
   if(!bar||!defaults)return;
   panel.classList.add('office-edit-ribbon');
   if(!document.getElementById('ribbonTemplateEditor')){const group=document.createElement('div');group.className='rb-group';const tools=document.createElement('div');tools.className='rb-tools';const button=document.createElement('button');button.id='ribbonTemplateEditor';button.type='button';button.className='btn';button.title='Excel şablon düzenleyicisini aç';button.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px';const icon=document.createElement('img');icon.src=root.ASMachEditIcons.template;icon.alt='';icon.width=24;icon.height=24;button.append(icon,document.createTextNode('Şablon Düzenleyici'));button.onclick=()=>root.ASMachExcelCellTemplate.pickEditor(root.ASMachApp);tools.append(button);const caption=document.createElement('div');caption.className='rb-caption';caption.textContent='Excel şablonları';group.append(tools,caption);panel.append(group);}
-  defaults.querySelectorAll('.rd-section').forEach((group,index)=>{if(index>1)group.classList.add('edit-defaults-hidden');});
+  defaults.querySelectorAll('.rd-section').forEach((group,index)=>{if(index>1&&!group.classList.contains('rd-ocr-default'))group.classList.add('edit-defaults-hidden');});
   defaults.querySelector('[aria-controls="rd-popup-0"]')?.classList.add('edit-defaults-hidden');
   const classLabel=document.createElement('label');classLabel.textContent='Karakteristik sınıfı';const classSelect=document.createElement('select');classSelect.id='ribbonCharacteristicClass';classSelect.setAttribute('aria-label','Karakteristik sınıfı');classLabel.append(classSelect);defaults.querySelectorAll('.rd-section')[1]?.append(classLabel);
   const syncClass=()=>{const source=document.getElementById('characteristicClass');if(!source)return;const options=source.innerHTML;if(classSelect.innerHTML!==options)classSelect.innerHTML=options;classSelect.value=source.value;classSelect.disabled=!root.ASMachApp?.selectedAnnotation();classSelect.title='Seçili karakteristiğin sınıfı';};
@@ -163,6 +163,9 @@
    html body .toolbar.excel-ribbon #rbPanel-format .edit-numbering-group .btn:hover{background:#e9f5fa;border-color:#c5e0ed}
    html body .toolbar.excel-ribbon #rbPanel-format .edit-numbering-group .rb-caption{display:block!important;text-align:center;font-size:9px;line-height:12px;color:#567184}
    html body .toolbar.excel-ribbon #rbPanel-format .edit-defaults-hidden{display:none!important}
+   html body .excel-ribbon #rbPanel-format.office-edit-ribbon .rd-section.rd-ocr-default{display:flex!important;flex:0 0 255px;align-items:center;justify-content:center;padding:0 12px 13px!important}
+   html body .excel-ribbon #rbPanel-format.office-edit-ribbon .rd-section.rd-ocr-default label{width:100%;justify-content:space-between}
+   html body .excel-ribbon #rbPanel-format.office-edit-ribbon .rd-section.rd-ocr-default select{width:130px!important}
    html body .excel-ribbon #rbPanel-format.office-edit-ribbon .rd-section:nth-of-type(2){grid-template-columns:155px 275px!important;column-gap:16px!important}
    html body .excel-ribbon #rbPanel-format.office-edit-ribbon .rd-section:nth-of-type(2) label:nth-of-type(4){grid-column:2;grid-row:2}
    html body .excel-ribbon #rbPanel-format.office-edit-ribbon .rd-section label{gap:8px!important}

@@ -571,9 +571,10 @@
         const tall = (image.naturalHeight || image.height) > (image.naturalWidth || image.width) * 1.4;
         const angles = tall ? [90, 270, 0, 180] : [0, 180, 90, 270];
         const candidates = [];
+        const firstEnhancement=options.enhancement==='strong'?'strong':'off';
         const scoreCandidate=candidate=>candidateScore(candidate,options.expectedMeasurementType||'');
         for (let index = 0; index < angles.length; index++) {
-          const result = await runPass(image, angles[index], false, false, index);
+          const result = await runPass(image, angles[index], false, false, index,undefined,false,firstEnhancement);
           candidates.push(result);
           // Only a single, fully accounted-for numeric row may take the fast
           // route. A second segmentation must agree before skipping recovery.
@@ -589,6 +590,7 @@
           // A plain number may be a fragment; only a confident complete technical pattern permits an early finish.
           if (!options.forceAll && scoreCandidate(result) >= 114 && result.confidence >= 75) break;
         }
+        if(firstEnhancement==='strong')candidates.push(await runPass(image,angles[0],false,false,'original-check','6',false,'off'));
         candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
         const bestAngle = candidates[0] ? candidates[0].angle : 0;
         if (options.forceAll || !candidates[0] || scoreCandidate(candidates[0]) < 112) candidates.push(await runPass(image, bestAngle, true, false, 5));
@@ -633,7 +635,6 @@
         const readingsAgree=root.ASMachOcrEnhancement?.agrees?.(candidates,best)===true;
         const hardGeometry=(best.layout?.ambiguityReasons||[]).some(reason=>['unattached_mark','ambiguous_mark_row','inverted_deviation_rows','separate_numeric_words'].includes(reason));
         const suspiciousLayout=hardGeometry||((best.layout?.missingDigits||best.layout?.ambiguousSpacing)&&!readingsAgree);
-        if(root.ASMachOcrEnhancement&&(enhancement!=='off'||!root.ASMachApp?.state.pdfDoc)&&(root.ASMachOcrEnhancement.compare(candidates,best)||suspiciousLayout||/^[ØR]?\s*0\d/.test(best.text))){best.needsReview=true;best.confidence=Math.min(best.confidence,45);best.reviewReason='Okumalar farklı veya rakam yerleşimi şüpheli. Nominal ve toleransları kaynak görüntüyle karşılaştırın.';}
         if(suspiciousLayout){best.needsReview=true;best.confidence=Math.min(best.confidence,45);best.reviewReason='Karakter aralıkları belirsiz veya okuma rakam kaybediyor. Kaynak görüntüyü kontrol edin.';}
         if(enhancement!=='off')root.ASMachOcrEnhancement.report(best);
         emit("Metin tanıma tamamlandı", 1);

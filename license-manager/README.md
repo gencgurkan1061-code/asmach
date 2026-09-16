@@ -1,5 +1,13 @@
 # ASMach Lisans Yönetimi
 
+## 3.0.5 lisans akışı
+
+Yeni lisanslar yalnızca çevrimiçi anahtarla ilk kez etkinleştirilir. TPM zorunlu değildir. Uygulama ilk etkinleştirmeden sonra TPM'yi sınar; kullanıcı onaylarsa TPM açık kimliği ve imza kanıtı lisans hizmetine gönderilir. TPM'ye bağlanan cihaz en fazla 90 gün çevrimdışı çalışır; lisans daha önce bitiyorsa çevrimdışı hak da lisansla birlikte biter. TPM kullanılamayan cihaz uygulama açılışında ve kullanım sırasında çevrimiçi doğrulama gerektirir.
+
+Yönetici uygulamasında **Detay** ekranının bulut bilgileri bölümünde TPM durumu, TPM kimliği, son TPM doğrulaması ve çevrimdışı izin bitişi görünür. Özel TPM anahtarı hiçbir zaman gösterilmez veya sunucuya gönderilmez. Bu alanların çalışması için güncel `asmach-license` Worker'ının yayımlanması gerekir; müşteri kurulum paketini `asmach-release` alanına yüklemek lisans hizmetini güncellemez.
+
+Aşağıdaki çevrimdışı ilk etkinleştirme açıklamaları yalnızca eski paketlerin tarihsel kullanımına aittir; 3.0.5 sihirbazında bu yol kaldırılmıştır.
+
 ## Yeni yönetim arayüzü
 
 Sol menü, özet ekranı, müşteri paneli, filtrelenebilir/sayfalı lisans listesi, üç adımlı oluşturma, toplu işlem önizlemesi, ayrı gönderim/cihaz durumları, anahtarsız CSV raporu ve şifreli yedek/geri yükleme eklendi. Açık pencereyi **Çıkış** ile kapatıp aynı yönetici EXE'sini yeniden açın. Müşteri kurulum paketi bu yönetim aracı değildir.

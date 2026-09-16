@@ -101,7 +101,13 @@
  function semanticReadings(candidates,best){
   const assess=root.ASMachRequirements?.assessReading;if(!best?.text)return[];
   const floor=Math.max(55,(Number(best.confidence)||0)-18);
-  const meaning=text=>{const assessed=assess?.(text);if(assessed?.valid)return assessed;const normalized=String(text||'').replace(/,/g,'.').replace(/\s+/g,'').replace(/(?:\d+(?:\.\d+)?|\.\d+)/g,value=>String(Number(value)));return{valid:!!normalized,signature:'text:'+normalized};};
+  const reference=assess?.(best.text),diameterParts=reference?.valid?JSON.parse(reference.signature):null;
+  const meaning=text=>{const assessed=assess?.(text);if(assessed?.valid){
+   // OCR can omit only the Ø glyph. That is not a disagreement when every
+   // measured value, fit class and tolerance still matches the diameter read.
+   if(diameterParts?.[1]==='Çap'&&!/[ØΦ⌀∅]/.test(text)){const parts=JSON.parse(assessed.signature);if(['Uzunluk','Geçme'].includes(parts[1])&&parts.every((value,i)=>i===1||JSON.stringify(value)===JSON.stringify(diameterParts[i])))return {...assessed,signature:reference.signature};}
+   return assessed;
+  }const normalized=String(text||'').replace(/,/g,'.').replace(/\s+/g,'').replace(/(?:\d+(?:\.\d+)?|\.\d+)/g,value=>String(Number(value)));return{valid:!!normalized,signature:'text:'+normalized};};
   return candidates.filter(c=>c?.text&&Number(c.confidence)>=floor).map(c=>({candidate:c,meaning:meaning(c.text)})).filter(x=>x.meaning.valid);
  }
  function bestSignature(best,readings){return readings.find(x=>x.candidate===best)?.meaning.signature||readings.find(x=>String(x.candidate.text)===String(best?.text))?.meaning.signature||'';}

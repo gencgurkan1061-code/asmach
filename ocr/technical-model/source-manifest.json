@@ -1,0 +1,43 @@
+{
+  "revision": "e12c65a915945e4c28e237a9b52bc4a8f39a0cec",
+  "langdataRevision": "07930fd9f246622c26eb5de794d9212ceac432d3",
+  "info": "LSTM: network=[1,36,0,1Ct3,3,16Mp3,3Lfys64Lfx96Lrx96Lfx512O1c1], int_mode=0, recoding=1, iteration=814100, sample_iteration=814136, null_char=110, learning_rate=0.001, momentum=0.5, adam_beta=0.999\r\nLayer Learning Rates: :0(Input)=0.001, :1:0(Convolve)=0.001, :1:1(ConvNL)=0.0005, :2(Maxpool)=0.001, :3:0(Lfys64)=0.0005, :4(Lfx96)=0.0005, :5:0(Lrx96)=0.0005, :6(Lfx512)=0.0005, :7(Output)=0.0005\r\n",
+  "files": [
+    {
+      "name": "eng.traineddata",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/e12c65a915945e4c28e237a9b52bc4a8f39a0cec/eng.traineddata",
+      "bytes": 15400601,
+      "sha256": "8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba"
+    },
+    {
+      "name": "LICENSE",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/e12c65a915945e4c28e237a9b52bc4a8f39a0cec/LICENSE",
+      "bytes": 10173,
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+    },
+    {
+      "name": "langdata/Latin.unicharset",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/langdata_lstm/07930fd9f246622c26eb5de794d9212ceac432d3/Latin.unicharset",
+      "bytes": 267393,
+      "sha256": "2c5344876ec1edfc3187530949c76b93aab97c6031fa94a48bf85f40a3c7e128"
+    },
+    {
+      "name": "langdata/Greek.unicharset",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/langdata_lstm/07930fd9f246622c26eb5de794d9212ceac432d3/Greek.unicharset",
+      "bytes": 216989,
+      "sha256": "c491485b52424626035c76ca27e5fd4824367f03577c386020618ee8ad8aa842"
+    },
+    {
+      "name": "langdata/Cyrillic.unicharset",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/langdata_lstm/07930fd9f246622c26eb5de794d9212ceac432d3/Cyrillic.unicharset",
+      "bytes": 208844,
+      "sha256": "75804950557227223e142862d8006df66d61d248ceacf46d4669641516b26876"
+    },
+    {
+      "name": "langdata/radical-stroke.txt",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/langdata_lstm/07930fd9f246622c26eb5de794d9212ceac432d3/radical-stroke.txt",
+      "bytes": 330874,
+      "sha256": "9b441331169924e640233ae3abff9b4ac7019e33978a074c9d322f89afab1b89"
+    }
+  ]
+}

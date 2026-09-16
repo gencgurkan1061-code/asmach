@@ -34,7 +34,7 @@
    }else action('⌄ Sütun filtresi…',()=>open(key,x,y,true),!allowed);
    action('Bu sütunun filtresini temizle',()=>{filters.delete(key);update();close();},!filters.has(key));
    if(!enumerate){
-    action('↔ Genişliği içeriğe uydur',()=>{const texts=[h?.textContent||'',...app.state.annotations.map(r=>value(r,key))];root.ASMachListColumns.setWidth(key,Math.max(...texts.map(t=>Math.min(80,t.length)))*6+32);close();},!h);
+    action('↔ Genişliği içeriğe uydur',()=>{root.ASMachListColumns.autoFit(key);close();},!h);
     const grouping=document.querySelector('#lcGrouping');action('Bu sütuna göre grupla',()=>{grouping.value=key;grouping.dispatchEvent(new Event('change',{bubbles:true}));close();},![...grouping.options].some(o=>o.value===key));
     action('Gruplamayı kaldır',()=>{grouping.value='';grouping.dispatchEvent(new Event('change',{bubbles:true}));close();},!grouping.value);
     action('Bu sütunu gizle',()=>{root.ASMachListColumns.hide(key);close();},!h||['selection','number'].includes(key));

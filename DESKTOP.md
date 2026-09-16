@@ -1,8 +1,8 @@
 # ASMach — Windows / Tauri 2
 
-## 3.0.3 paket durumu — 16 Eylül 2026
+## 3.0.4 paket durumu — 16 Eylül 2026
 
-Kaynak ve masaüstü ön yüzü 3.0.3 olarak hazırlandı. Yeni NSIS kurulum dosyası henüz oluşturulmadı: bu bilgisayarda Windows Uygulama Denetimi hem Rustup Cargo başlatıcısını hem de kurulu toolchain içindeki `cargo.exe` dosyasını engelliyor (OS 4551). İzinli derleme denemesi de aynı nedenle durdu. `3.0.2` kurulum dosyası 3.0.3 olarak yeniden adlandırılmamalı veya yayınlanmamalı. Derleyiciye yönetici tarafından izin verildikten sonra `powershell -File scripts/desktop.ps1 build` çalıştırılmalı; test ve kurulum doğrulaması tamamlanmadan yayın bildirimi güncellenmemeli.
+3.0.3 zaten son sürüm olduğu için güncel kaynaklardan `src-tauri/target/release/bundle/nsis/ASMach Inspection_3.0.4_x64-setup.exe` NSIS kurulum dosyası üretildi. Dosya sürümü 3.0.4, boyutu 31.012.181 bayt, SHA-256 değeri `79EC3FD4C20B0A45B3E207C7559F125DE948E8F66318303E3769C37F314ACB15`. Kurulum, lisans yayını ve masaüstü köprüsü için 15 otomatik test geçti. Kurulum dosyası henüz imzalı değil ve gerçek bir Windows kurulum/güncelleme denemesi bu aşamada yapılmadı. Lisans Yönetimi'ne elle yüklenebilir; Cloudflare yayını kullanıcıya bırakılmıştır. Önceki 3.0.3 dosyası yeni yayın için kullanılmamalı.
 
 ## Bu bilgisayardaki doğrulama durumu — 15 Eylül 2026
 

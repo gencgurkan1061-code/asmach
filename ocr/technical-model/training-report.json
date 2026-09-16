@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "Tesseract-LSTM-finetune",
+  "trainingSeconds": 511.46304509999754,
+  "maxIterations": 14000,
+  "trainingLines": 4800,
+  "validationLines": 200,
+  "holdoutLinesUsedForTraining": 0,
+  "corpusSha256": "cf0124c68e1811bf162a4e04caa07d7ecde9abeaa86024447f4ddd4f9da33210",
+  "holdoutManifestSha256": "a33b4401ccdf09ed9beb58c599520ccbba2ef7ab4abae70bf129e9e2c69b0aa9",
+  "sha256": "fc53dc416ddb77f79bbed3b7a4fe47c86dd1559bfc9a438b02f7e9f79921acd2",
+  "gzipSha256": "8d9bc6fc9e330dc0e7160368f913d3bd1be59ca3ea30796bd83be5a5c85f3b77",
+  "bytes": 1498665,
+  "gzipBytes": 1338697,
+  "network": "LSTM: network=[1,36,0,1Ct3,3,16Mp3,3Lfys64Lfx96Lrx96Lfx512O1c1], int_mode=1, recoding=1, iteration=9700, sample_iteration=9700, null_char=114, learning_rate=0.001, momentum=0.5, adam_beta=0.999\r\nLayer Learning Rates: :0(Input)=0.001, :1:0(Convolve)=0.001, :1:1(ConvNL)=0.0005, :2(Maxpool)=0.001, :3:0(Lfys64)=0.0005, :4(Lfx96)=0.0005, :5:0(Lrx96)=0.0005, :6(Lfx512)=0.0005, :7(Output)=0.0005\r\n",
+  "validation": "Warning: LSTMTrainer deserialized an LSTMRecognizer!\r\nBCER eval=0.744, BWER eval=3.333\r\n",
+  "validationSelection": [
+    {
+      "checkpoint": "runs/balanced-v2/checkpoints/asmtech_2.712_1085_3500.checkpoint",
+      "bcer": 1.896,
+      "evaluation": "Warning: LSTMTrainer deserialized an LSTMRecognizer!\r\nBCER eval=1.896, BWER eval=8.833\r\n"
+    },
+    {
+      "checkpoint": "runs/balanced-v2/checkpoints/asmtech_1.313_1274_6600.checkpoint",
+      "bcer": 1.778,
+      "evaluation": "Warning: LSTMTrainer deserialized an LSTMRecognizer!\r\nBCER eval=1.778, BWER eval=6.417\r\n"
+    },
+    {
+      "checkpoint": "runs/balanced-v2/checkpoints/asmtech_0.638_1395_9700.checkpoint",
+      "bcer": 0.744,
+      "evaluation": "Warning: LSTMTrainer deserialized an LSTMRecognizer!\r\nBCER eval=0.744, BWER eval=3.333\r\n"
+    },
+    {
+      "checkpoint": "runs/balanced-v2/checkpoints/asmtech_checkpoint",
+      "bcer": 1.264,
+      "evaluation": "Warning: LSTMTrainer deserialized an LSTMRecognizer!\r\nBCER eval=1.264, BWER eval=5.417\r\n"
+    }
+  ],
+  "selectedCheckpoint": "runs/balanced-v2/checkpoints/asmtech_0.638_1395_9700.checkpoint",
+  "export": "Loaded file runs/balanced-v2/checkpoints/asmtech_0.638_1395_9700.checkpoint, unpacking...\r\n",
+  "productionEnabled": false
+}

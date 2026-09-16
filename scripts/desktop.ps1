@@ -17,5 +17,5 @@ if($Mode -eq 'doctor'){
 if($Mode -eq 'test'){& cargo.exe test --manifest-path src-tauri/Cargo.toml;if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};& $nodePath --test tests/tauri-bridge.test.cjs;exit $LASTEXITCODE}
 $cli=Join-Path $projectDirectory 'node_modules/@tauri-apps/cli/tauri.js'
 if(-not (Test-Path -LiteralPath $cli)){throw 'Önce npm ci ile proje bağımlılıklarını kurun.'}
-if($Mode -eq 'dev'){& $nodePath $cli dev}else{& $nodePath $cli build --bundles nsis}
+if($Mode -eq 'dev'){& $nodePath $cli dev}else{& $nodePath $cli build --bundles nsis;if($LASTEXITCODE -eq 0){& $nodePath (Join-Path $projectDirectory 'scripts/collect-installers.cjs')}}
 exit $LASTEXITCODE

@@ -34,7 +34,9 @@ document.addEventListener('keydown',e=>{if(root.ASMachKeyboard?.inWorkspace()||e
   #qtDrawingMenu button[aria-checked=true] .qt-menu-icon{border:0;background:transparent}
   #qtDrawingMenu button[aria-checked=true] kbd{color:#236571}
   #qtDrawingMenu .qt-submenu-host{position:relative}
+  #qtDrawingMenu .qt-submenu-host>button{grid-template-columns:20px minmax(0,1fr) auto 28px}
   #qtDrawingMenu .qt-submenu-host>button::after{content:'›';font-size:17px;line-height:1;color:#526b7d}
+  #qtDrawingMenu .qt-submenu-host>button[aria-checked=true]::after{content:'✓  ›';width:28px;font-size:15px;color:#007384}
   #qtDrawingMenu .qt-submenu{display:none;position:fixed;z-index:2147483647;width:210px;padding:4px;border:1px solid #aeb9c2;border-radius:4px;background:#fafafa;box-shadow:2px 5px 16px #172b3c40}
   #qtDrawingMenu .qt-submenu-host[data-open=true]>.qt-submenu{display:block}
   #qtDrawingMenu .qt-submenu .qt-menu-heading{padding-left:8px;margin:0 0 2px}
@@ -106,7 +108,7 @@ document.addEventListener('keydown',e=>{if(root.ASMachKeyboard?.inWorkspace()||e
   function measurementSubmenu(){
    const source=document.querySelector('[data-for="boxContentMode"][data-choice="dimension"]');if(!source)return;
    const host=document.createElement('div');host.className='qt-submenu-host';
-   const trigger=document.createElement('button');trigger.type='button';trigger.setAttribute('role','menuitem');trigger.setAttribute('aria-haspopup','menu');trigger.setAttribute('aria-expanded','false');
+   const trigger=document.createElement('button');trigger.type='button';trigger.setAttribute('role','menuitemradio');trigger.setAttribute('aria-haspopup','menu');trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-checked',String(root.ASMachApp?.state.mode==='box'&&document.getElementById('boxContentMode')?.value==='dimension'));
    const icon=document.createElement('span');icon.className='qt-menu-icon';icon.setAttribute('aria-hidden','true');toolIcon(icon,'[data-for="boxContentMode"][data-choice="dimension"]','Ölçü');
    const name=document.createElement('span'),key=document.createElement('kbd');name.textContent='Ölçü';key.textContent='Alt+2';trigger.append(icon,name,key);
    const submenu=document.createElement('div');submenu.className='qt-submenu';submenu.setAttribute('role','menu');submenu.setAttribute('aria-label','Algılanacak ölçü türü');

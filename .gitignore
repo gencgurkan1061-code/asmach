@@ -6,6 +6,8 @@ dist-web/
 src-tauri/target/
 src-tauri/gen/
 outputs/
+Kurulum Paketleri/
+publisher-site/downloads/
 tmp/
 *.log
 *.key

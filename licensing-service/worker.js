@@ -16,7 +16,20 @@ async function signed(payload,env,withReceipt=true){
  return Response.json({payload:encoded,signature:b64(await crypto.subtle.sign('Ed25519',key,data)),...(receipt?{ackToken:b64(await crypto.subtle.sign('HMAC',receipt,encoder.encode('receipt:'+encoded)))}:{})},{headers:{'Cache-Control':'no-store'}});
 }
 async function activationRecord(env,id,body){const stub=env.ACTIVATIONS.get(env.ACTIVATIONS.idFromName(id));return stub.fetch('https://activation/internal',{method:'POST',body:JSON.stringify(body)});}
-async function boundEnvelope(r,env){if(!r?.deviceId||!r.envelope||r.revoked)return null;const p=JSON.parse(new TextDecoder().decode(from64(r.envelope.payload)));const activation=await (await signed({version:1,product:'asmach-activation',licenseId:p.licenseId,deviceId:r.deviceId,issuedAt:r.activatedAt},env,false)).json();return {...r.envelope,activation};}
+async function boundEnvelope(r,env){if(!r?.deviceId||!r.envelope||r.revoked)return null;const p=JSON.parse(new TextDecoder().decode(from64(r.envelope.payload)));const activation=await (await signed({version:1,product:'asmach-activation',licenseId:p.licenseId,deviceId:r.deviceId,binding:r.binding||'tpm-cng-v1',issuedAt:r.activatedAt},env,false)).json();return {...r.envelope,activation};}
+async function verifiedIdentity(proof,challenge,binding){
+ try{
+  if(!proof||proof.binding!==binding)return null;
+  const pub=from64(proof.publicKey||''),signature=from64(proof.signature||'');
+  if(pub.length!==72||String.fromCharCode(...pub.slice(0,4))!=='ECS1'||pub[4]!==32||pub[5]||pub[6]||pub[7]||signature.length!==64||proof.challenge!==b64(challenge))return null;
+  const id=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pub)),x=>x.toString(16).padStart(2,'0')).join('');if(proof.deviceId!==id)return null;
+  const sec1=new Uint8Array(65);sec1[0]=4;sec1.set(pub.slice(8),1);const key=await crypto.subtle.importKey('raw',sec1,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
+  return await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,signature,challenge)?{deviceId:id,publicKey:proof.publicKey}:null;
+ }catch{return null;}
+}
+async function verifiedTicket(body,env,deviceId){
+ try{const hmac=await crypto.subtle.importKey('raw',encoder.encode(env.ADMIN_TOKEN),{name:'HMAC',hash:'SHA-256'},false,['verify']);const ticket=body.ticket;if(!await crypto.subtle.verify('HMAC',hmac,from64(ticket.signature),encoder.encode(ticket.payload)))return null;const data=JSON.parse(new TextDecoder().decode(from64(ticket.payload)));return data.deviceId===deviceId&&data.expiresAt>=Math.floor(Date.now()/1000)?from64(data.challenge):null;}catch{return null;}
+}
 export default {async fetch(request,env){
  const url=new URL(request.url);
  if(request.method==='GET'&&url.pathname.startsWith('/version/')){
@@ -27,7 +40,7 @@ export default {async fetch(request,env){
   return Response.json({version:release.version,minimumVersion:release.minimumVersion,notes:release.notes||'',pubDate:release.pubDate},{headers:{'Cache-Control':'no-store'}});
  }
  const admin=['/admin/ping','/admin/license','/admin/revoke','/admin/detail','/admin/release','/admin/requests','/admin/request-status'].includes(url.pathname);
- if(request.method!=='POST'||(!admin&&!['/validate','/discover','/discover-challenge','/activate','/ack','/request-license'].includes(url.pathname)))return new Response('Not found',{status:404});
+ if(request.method!=='POST'||(!admin&&!['/validate','/discover','/discover-challenge','/activate','/offline-enable','/ack','/request-license'].includes(url.pathname)))return new Response('Not found',{status:404});
  if(admin){const expected=env.ADMIN_TOKEN||'',provided=request.headers.get('authorization')||'';const a=new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode('Bearer '+expected))),b=new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(provided)));let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];if(expected.length<32||diff)return new Response('Unauthorized',{status:401});}
  const limit=admin||url.pathname==='/ack'?24000:url.pathname==='/request-license'?8192:2048;
  if(Number(request.headers.get('content-length'))>limit)return new Response('Too large',{status:413});
@@ -37,6 +50,19 @@ export default {async fetch(request,env){
  let body;try{const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.length;}body=JSON.parse(new TextDecoder().decode(bytes));}catch{return new Response('Bad JSON',{status:400});}
  if(!body||typeof body!=='object')return new Response('Bad request',{status:400});
  const ok=value=>Response.json({ok:true,...value},{headers:{'Cache-Control':'no-store'}});
+ if(url.pathname==='/request-license'){
+  try{
+   const r=body,p=r.proof||{},time=Math.floor(Date.now()/1000);
+   if(r.version!==1||r.product!=='asmach-license-request'||!/^[a-f0-9-]{36}$/.test(r.requestId||'')||!/^[a-f0-9]{64}$/.test(r.deviceId||'')||typeof r.company!=='string'||r.company.trim().length<2||r.company.length>160||typeof r.contact!=='string'||r.contact.length>200||typeof r.note!=='string'||r.note.length>500||!Number.isSafeInteger(r.createdAt)||r.createdAt<time-2592000||r.createdAt>time+300)throw Error();
+   const pub=from64(p.publicKey||'');if(pub.length!==72||pub[0]!==69||pub[1]!==67||pub[2]!==83||pub[3]!==49||pub[4]!==32||pub[5]||pub[6]||pub[7])throw Error();
+   const id=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pub)),x=>x.toString(16).padStart(2,'0')).join('');if(id!==r.deviceId||p.deviceId!==id||p.binding!=='tpm-cng-v1')throw Error();
+   const challenge=from64(p.challenge||''),signature=from64(p.signature||'');if(challenge.length!==32||signature.length!==64)throw Error();
+   const sec1=new Uint8Array(65);sec1[0]=4;sec1.set(pub.slice(8),1);const key=await crypto.subtle.importKey('raw',sec1,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);if(!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,signature,challenge))throw Error();
+   const priorId=await env.REVOCATIONS.get('license-request-device:'+id),prior=priorId?await env.REVOCATIONS.get('license-request:'+priorId,'json'):null;if(prior&&prior.createdAt>time-300&&prior.status==='new')return ok({requestId:prior.requestId});
+   const clean={version:1,requestId:r.requestId,deviceId:id,company:r.company.trim(),contact:r.contact.trim(),note:r.note.trim(),appVersion:String(r.appVersion||'').slice(0,30),createdAt:r.createdAt,receivedAt:time,status:'new'};
+   await env.REVOCATIONS.put('license-request:'+r.requestId,JSON.stringify(clean),{expirationTtl:7776000});await env.REVOCATIONS.put('license-request-device:'+id,r.requestId,{expirationTtl:7776000});return ok({requestId:r.requestId});
+  }catch{return new Response('Invalid license request',{status:400});}
+ }
   if(url.pathname==='/ack'){
   let receipt;
   try{
@@ -62,45 +88,50 @@ export default {async fetch(request,env){
   if(!old||receipt.issuedAt>old.checkedAt&&(receipt.status!==old.status||receipt.client?.appVersion!==old.appVersion||receipt.issuedAt-old.checkedAt>=300))await env.REVOCATIONS.put('seen:'+receipt.licenseId,JSON.stringify({checkedAt:receipt.issuedAt,status:receipt.status,deviceId:receipt.deviceId,...receipt.client}));
   return ok({});
  }
- if(url.pathname.startsWith('/discover')||url.pathname==='/activate'){
+ if(url.pathname.startsWith('/discover')||url.pathname==='/activate'||url.pathname==='/offline-enable'){
   const {deviceId}=body;if(!/^[a-f0-9]{64}$/.test(deviceId||''))return new Response('Bad device',{status:400});
   const hmac=await crypto.subtle.importKey('raw',encoder.encode(env.ADMIN_TOKEN),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);
   if(url.pathname==='/discover-challenge'){const challenge=b64(crypto.getRandomValues(new Uint8Array(32))),payload=b64(encoder.encode(JSON.stringify({deviceId,challenge,expiresAt:Math.floor(Date.now()/1000)+90})));return ok({challenge,payload,signature:b64(await crypto.subtle.sign('HMAC',hmac,encoder.encode(payload)))});}
-  let ticket;
-  try{if(!await crypto.subtle.verify('HMAC',hmac,from64(body.ticket.signature),encoder.encode(body.ticket.payload)))throw Error();ticket=JSON.parse(new TextDecoder().decode(from64(body.ticket.payload)));if(ticket.deviceId!==deviceId||ticket.expiresAt<Math.floor(Date.now()/1000))throw Error();
-   const pub=from64(body.publicKey);if(pub.length!==72||pub[0]!==69||pub[1]!==67||pub[2]!==83||pub[3]!==49||pub[4]!==32||pub[5]||pub[6]||pub[7])throw Error();
-   const id=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pub)),x=>x.toString(16).padStart(2,'0')).join('');if(id!==deviceId)throw Error();
-   const sec1=new Uint8Array(65);sec1[0]=4;sec1.set(pub.slice(8),1);const key=await crypto.subtle.importKey('raw',sec1,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);if(!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,from64(body.proof),from64(ticket.challenge)))throw Error();
-  }catch{return new Response('Invalid device proof',{status:403});}
+  const challenge=await verifiedTicket(body,env,deviceId);
+  const main=challenge?await verifiedIdentity({deviceId,binding:body.binding||'tpm-cng-v1',publicKey:body.publicKey,challenge:b64(challenge),signature:body.proof},challenge,body.binding||'tpm-cng-v1'):null;
+  if(!main||main.deviceId!==deviceId)return new Response('Invalid device proof',{status:403});
   if(url.pathname==='/activate'){
    const code=String(body.activationKey||'').trim().toUpperCase();if(!/^[A-F0-9]{8}-[A-F0-9]{4}-4[A-F0-9]{3}-[89AB][A-F0-9]{3}-[A-F0-9]{12}$/.test(code))return new Response('Invalid activation key',{status:400});
    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(code))),x=>x.toString(16).padStart(2,'0')).join('');
    const id=await env.REVOCATIONS.get('activation-key:'+hash);if(!id)return new Response('License key not found',{status:403});
    // Activation is rare; preserve any historical KV revocation before issuing a certificate.
    if(await env.REVOCATIONS.get('revoked:'+id)){const denied=await activationRecord(env,id,{action:'revoke'});if(!denied.ok)return new Response('Revocation storage unavailable',{status:503});return new Response('License revoked',{status:403});}
-   const response=await activationRecord(env,id,{action:'claim',keyHash:hash,deviceId});if(!response.ok)return response;
-   const record=await response.json(),licenseUpdate=await boundEnvelope(record,env);
-   return signed({version:1,product:'asmach-inspection',licenseId:id,deviceId,nonce:ticket.challenge,status:'active',issuedAt:Math.floor(Date.now()/1000),licenseUpdate},env);
+   const response=await activationRecord(env,id,{action:'claim',keyHash:hash,deviceId,binding:body.binding||'tpm-cng-v1',publicKey:body.publicKey});if(!response.ok)return response;
+   let record=await response.json(),offlineUntil=0,tpmDeviceId='',issuedAt=Math.floor(Date.now()/1000);
+   if(record.tpmDeviceId){
+    const tpm=await verifiedIdentity(body.tpmProof,challenge,'tpm-cng-v1');
+    if(!tpm||tpm.deviceId!==record.tpmDeviceId||record.tpmPublicKey&&tpm.publicKey!==record.tpmPublicKey)return new Response('TPM proof required',{status:403});
+    const claims=JSON.parse(new TextDecoder().decode(from64(record.envelope.payload)));
+    offlineUntil=Math.min(claims.expiresAt,issuedAt+90*86400);tpmDeviceId=tpm.deviceId;
+    const renewed=await activationRecord(env,id,{action:'renew-offline',tpmDeviceId,offlineUntil,checkedAt:issuedAt});if(!renewed.ok)return renewed;
+    record=await renewed.json();
+   }
+   const licenseUpdate=await boundEnvelope(record,env);
+   await env.REVOCATIONS.put('device:'+deviceId,id);
+   return signed({version:1,product:'asmach-inspection',licenseId:id,deviceId,nonce:b64(challenge),status:'active',issuedAt,licenseUpdate,...(offlineUntil?{offlineUntil,tpmDeviceId}:{})},env);
   }
-  if(url.pathname==='/request-license'){
-   try{
-    const r=body,p=r.proof||{},time=Math.floor(Date.now()/1000);
-    if(r.version!==1||r.product!=='asmach-license-request'||!/^[a-f0-9-]{36}$/.test(r.requestId||'')||!/^[a-f0-9]{64}$/.test(r.deviceId||'')||typeof r.company!=='string'||r.company.trim().length<2||r.company.length>160||typeof r.contact!=='string'||r.contact.length>200||typeof r.note!=='string'||r.note.length>500||!Number.isSafeInteger(r.createdAt)||r.createdAt<time-2592000||r.createdAt>time+300)throw Error();
-    const pub=from64(p.publicKey||'');if(pub.length!==72||pub[0]!==69||pub[1]!==67||pub[2]!==83||pub[3]!==49||pub[4]!==32||pub[5]||pub[6]||pub[7])throw Error();
-    const id=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',pub)),x=>x.toString(16).padStart(2,'0')).join('');if(id!==r.deviceId||p.deviceId!==id||p.binding!=='tpm-cng-v1')throw Error();
-    const challenge=from64(p.challenge||''),signature=from64(p.signature||'');if(challenge.length!==32||signature.length!==64)throw Error();
-    const sec1=new Uint8Array(65);sec1[0]=4;sec1.set(pub.slice(8),1);const key=await crypto.subtle.importKey('raw',sec1,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);if(!await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},key,signature,challenge))throw Error();
-    const priorId=await env.REVOCATIONS.get('license-request-device:'+id),prior=priorId?await env.REVOCATIONS.get('license-request:'+priorId,'json'):null;if(prior&&prior.createdAt>time-300&&prior.status==='new')return ok({requestId:prior.requestId});
-    const clean={version:1,requestId:r.requestId,deviceId:id,company:r.company.trim(),contact:r.contact.trim(),note:r.note.trim(),appVersion:String(r.appVersion||'').slice(0,30),createdAt:r.createdAt,receivedAt:time,status:'new'};
-    await env.REVOCATIONS.put('license-request:'+r.requestId,JSON.stringify(clean),{expirationTtl:7776000});await env.REVOCATIONS.put('license-request-device:'+id,r.requestId,{expirationTtl:7776000});return ok({requestId:r.requestId});
-   }catch{return new Response('Invalid license request',{status:400});}
+  if(url.pathname==='/offline-enable'){
+   const id=String(body.licenseId||'');if(!/^[a-f0-9-]{36}$/.test(id)||main.deviceId!==deviceId||body.binding!=='software-cng-v1')return new Response('Invalid license',{status:400});
+   const tpm=await verifiedIdentity(body.tpmProof,challenge,'tpm-cng-v1');if(!tpm)return new Response('Invalid TPM proof',{status:403});
+   const current=await activationRecord(env,id,{action:'get'});if(!current.ok)return new Response('Activation service unavailable',{status:503});const record=await current.json();
+   if(record.deviceId!==deviceId||record.publicKey!==body.publicKey||record.revoked)return new Response('License unavailable',{status:403});
+   const claims=JSON.parse(new TextDecoder().decode(from64(record.envelope.payload))),issuedAt=Math.floor(Date.now()/1000);
+   if(claims.expiresAt<=issuedAt)return new Response('License expired',{status:403});
+   const offlineUntil=Math.min(claims.expiresAt,issuedAt+90*86400),changed=await activationRecord(env,id,{action:'enable-offline',deviceId,tpmDeviceId:tpm.deviceId,tpmPublicKey:tpm.publicKey,offlineUntil,checkedAt:issuedAt});if(!changed.ok)return changed;
+   const updated=await changed.json();return signed({version:1,product:'asmach-inspection',licenseId:id,deviceId,nonce:b64(challenge),status:'active',issuedAt,tpmDeviceId:tpm.deviceId,offlineUntil,licenseUpdate:await boundEnvelope(updated,env)},env);
   }
   let id=await env.REVOCATIONS.get('device:'+deviceId);
   // Compatibility with licenses published before the device index existed.
   if(!id){const page=await env.REVOCATIONS.list({prefix:'license:',limit:100});if(!page.list_complete)return new Response('Index migration required',{status:503});let latest=null;for(const k of page.keys){const raw=await env.REVOCATIONS.get(k.name);if(!raw)continue;const p=JSON.parse(new TextDecoder().decode(from64(JSON.parse(raw).payload)));if(p.deviceId===deviceId&&p.version===2&&p.binding==='tpm-cng-v1'&&(!latest||p.issuedAt>latest.issuedAt||(p.issuedAt===latest.issuedAt&&p.expiresAt>latest.expiresAt)))latest=p;}id=latest?.licenseId;}
+  let activation=null;if(id&&env.ACTIVATIONS){const response=await activationRecord(env,id,{action:'get'});if(!response.ok)return new Response('Activation service unavailable',{status:503});activation=await response.json();if(activation?.tpmDeviceId){const tpm=await verifiedIdentity(body.tpmProof,challenge,'tpm-cng-v1');if(!tpm||tpm.deviceId!==activation.tpmDeviceId||activation.tpmPublicKey&&tpm.publicKey!==activation.tpmPublicKey)return new Response('TPM proof required',{status:403});}}
   const raw=id?await env.REVOCATIONS.get('license:'+id):null,revoked=id?await env.REVOCATIONS.get('revoked:'+id):null;
-  const licenseUpdate=raw&&!revoked?JSON.parse(raw):null;
-  return signed({version:1,product:'asmach-inspection',licenseId:id||'',deviceId,nonce:ticket.challenge,status:revoked?'revoked':licenseUpdate?'active':'inactive',issuedAt:Math.floor(Date.now()/1000),...(licenseUpdate?{licenseUpdate}:{})},env);
+  const licenseUpdate=activation?.deviceId===deviceId&&!activation.revoked?await boundEnvelope(activation,env):raw&&!revoked?JSON.parse(raw):null;
+  return signed({version:1,product:'asmach-inspection',licenseId:id||'',deviceId,nonce:b64(challenge),status:revoked?'revoked':licenseUpdate?'active':'inactive',issuedAt:Math.floor(Date.now()/1000),...(licenseUpdate?{licenseUpdate}:{})},env);
  }
   if(admin){
    if(url.pathname==='/admin/ping')return ok({});
@@ -122,7 +153,7 @@ export default {async fetch(request,env){
    const raw=activation?.envelope?JSON.stringify(activation.envelope):await env.REVOCATIONS.get('license:'+licenseId);
    const revoked=activation?.revoked||((!activation?.envelope||!activation.kvRevocationChecked)&&await env.REVOCATIONS.get('revoked:'+licenseId));
    const legacySeen=detail?.lastCheck?null:await env.REVOCATIONS.get('seen:'+licenseId);
-   return ok({activation:activation?{deviceId:activation.deviceId||null,activatedAt:activation.activatedAt||null,revoked:!!activation.revoked}:null,licenseId,status:revoked?'revoked':raw?'active':'missing',license:raw?JSON.parse(new TextDecoder().decode(from64(JSON.parse(raw).payload))):null,lastCheck:detail?.lastCheck||(legacySeen?JSON.parse(legacySeen):null),checkedAt:Math.floor(Date.now()/1000)});
+   return ok({activation:activation?{deviceId:activation.deviceId||null,binding:activation.binding||'tpm-cng-v1',activatedAt:activation.activatedAt||null,tpmDeviceId:activation.tpmDeviceId||null,lastTpmCheck:activation.lastTpmCheck||null,offlineUntil:activation.offlineUntil||null,revoked:!!activation.revoked}:null,licenseId,status:revoked?'revoked':raw?'active':'missing',license:raw?JSON.parse(new TextDecoder().decode(from64(JSON.parse(raw).payload))):null,lastCheck:detail?.lastCheck||(legacySeen?JSON.parse(legacySeen):null),checkedAt:Math.floor(Date.now()/1000)});
   }
   if(url.pathname==='/admin/revoke'){if(env.ACTIVATIONS){const response=await activationRecord(env,licenseId,{action:'revoke'});if(!response.ok)return new Response('Revocation storage unavailable',{status:503});}await env.REVOCATIONS.put('revoked:'+licenseId,'1');return ok({licenseId});}
   try{
@@ -147,13 +178,30 @@ export default {async fetch(request,env){
  if(!/^[a-f0-9-]{36}$/.test(licenseId||'')||!/^[a-f0-9]{64}$/.test(deviceId||'')||!/^[a-f0-9-]{36}$/.test(nonce||''))return new Response('Bad request',{status:400});
  let revoked=false;
  let licenseUpdate;
+ let offlineUntil=0,tpmDeviceId='';
  try{
   // Read the authoritative binding first. KV replicas may still contain an older grant.
   let r=null;if(env.ACTIVATIONS){const response=await activationRecord(env,licenseId,{action:'get'});if(!response.ok)return new Response('Activation service unavailable',{status:503});r=await response.json();}
   if(r?.envelope&&!r.revoked&&!r.kvRevocationChecked){const previous=!!await env.REVOCATIONS.get('revoked:'+licenseId);const response=await activationRecord(env,licenseId,{action:'migrate-revocation',revoked:previous});if(!response.ok)return new Response('Revocation migration unavailable',{status:503});r=await response.json();}
   if(r?.revoked)revoked='1';
-  else if(r?.envelope){if(r.deviceId===deviceId)licenseUpdate=await boundEnvelope(r,env);}
-  else {revoked=!!await env.REVOCATIONS.get('revoked:'+licenseId);if(!revoked){const raw=await env.REVOCATIONS.get('license:'+licenseId);if(raw){const e=JSON.parse(raw),p=JSON.parse(new TextDecoder().decode(from64(e.payload)));if(p.deviceId===deviceId&&p.licenseId===licenseId)licenseUpdate=e;}}}
+  else if(r?.envelope){
+   if(r.deviceId===deviceId){
+    if(r.binding==='software-cng-v1'){
+     const challenge=await verifiedTicket(body,env,deviceId),online=challenge?await verifiedIdentity(body.onlineProof,challenge,'software-cng-v1'):null;
+     if(!online||online.publicKey!==r.publicKey)return new Response('Online device proof required',{status:403});
+     if(r.tpmDeviceId){const tpm=await verifiedIdentity(body.tpmProof,challenge,'tpm-cng-v1');if(!tpm||tpm.deviceId!==r.tpmDeviceId||tpm.publicKey!==r.tpmPublicKey)return new Response('TPM proof required',{status:403});tpmDeviceId=r.tpmDeviceId;}
+     const seen=await activationRecord(env,licenseId,{action:'ack',receipt:{issuedAt:Math.floor(Date.now()/1000),status:'active',deviceId}});if(!seen.ok)return new Response('Receipt storage unavailable',{status:503});
+    }
+    if((r.binding||'tpm-cng-v1')==='tpm-cng-v1'&&body.ticket&&body.tpmProof){
+     const challenge=await verifiedTicket(body,env,deviceId),tpm=challenge?await verifiedIdentity(body.tpmProof,challenge,'tpm-cng-v1'):null;
+     if(!tpm||tpm.deviceId!==deviceId||r.publicKey&&tpm.publicKey!==r.publicKey)return new Response('TPM proof required',{status:403});
+     tpmDeviceId=deviceId;
+    }
+    licenseUpdate=await boundEnvelope(r,env);
+    if(tpmDeviceId){const claims=JSON.parse(new TextDecoder().decode(from64(r.envelope.payload))),checkedAt=Math.floor(Date.now()/1000);offlineUntil=Math.min(claims.expiresAt,checkedAt+90*86400);const updated=await activationRecord(env,licenseId,{action:'renew-offline',tpmDeviceId,offlineUntil,checkedAt});if(!updated.ok)return new Response('Offline renewal unavailable',{status:503});}
+   }
+  }
+  else {revoked=!!await env.REVOCATIONS.get('revoked:'+licenseId);if(!revoked){const raw=await env.REVOCATIONS.get('license:'+licenseId);if(raw){const e=JSON.parse(raw),p=JSON.parse(new TextDecoder().decode(from64(e.payload)));if(p.deviceId===deviceId&&p.licenseId===licenseId){licenseUpdate=e;if(p.binding==='tpm-cng-v1'&&body.ticket&&body.tpmProof){const challenge=await verifiedTicket(body,env,deviceId),tpm=challenge?await verifiedIdentity(body.tpmProof,challenge,'tpm-cng-v1'):null;if(!tpm||tpm.deviceId!==deviceId)return new Response('TPM proof required',{status:403});tpmDeviceId=deviceId;offlineUntil=Math.min(p.expiresAt,Math.floor(Date.now()/1000)+90*86400);}}}}}
  }catch{return new Response('Invalid record',{status:503});}
- return signed({version:1,product:'asmach-inspection',licenseId,deviceId,nonce,status:revoked?'revoked':licenseUpdate?'active':'inactive',issuedAt:Math.floor(Date.now()/1000),...(licenseUpdate?{licenseUpdate}:{})},env);
+ return signed({version:1,product:'asmach-inspection',licenseId,deviceId,nonce,status:revoked?'revoked':licenseUpdate?'active':'inactive',issuedAt:Math.floor(Date.now()/1000),...(licenseUpdate?{licenseUpdate}:{}),...(offlineUntil?{offlineUntil,tpmDeviceId}:{})},env);
 }};

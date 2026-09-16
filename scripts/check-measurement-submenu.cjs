@@ -19,11 +19,18 @@ const assert=require('node:assert/strict');
     assert.equal(await page.locator('#boxContentMode').inputValue(),'dimension');
     assert.equal(await page.locator('#boxMeasurementType').inputValue(),'Diş');
     await page.locator('#overlay').click({button:'right',position:{x:30,y:30}});
+    assert.equal(await submenu.locator(':scope > button').getAttribute('aria-checked'),'true','selected measurement subtype also selects its parent');
     assert.equal(await submenu.locator('[role="menuitemradio"]').filter({hasText:'Diş'}).first().getAttribute('aria-checked'),'true');
     await submenu.locator(':scope > button').focus();
     await page.keyboard.press('ArrowRight');
     await submenu.getByRole('menuitemradio',{name:'Otomatik tür seçimi'}).click();
     assert.equal(await page.locator('#boxMeasurementType').inputValue(),'');
+    await page.locator('#overlay').click({button:'right',position:{x:30,y:30}});
+    assert.equal(await submenu.locator(':scope > button').getAttribute('aria-checked'),'true','automatic measurement subtype keeps its parent selected');
+    await page.keyboard.press('Escape');
+    await page.evaluate(()=>ASMachApp.setMode('select'));
+    await page.locator('#overlay').click({button:'right',position:{x:30,y:30}});
+    assert.equal(await submenu.locator(':scope > button').getAttribute('aria-checked'),'false','inactive measurement mode is not selected');
     console.log('PASS: right-click measurement submenu, selected type and automatic reset.');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -28,7 +28,23 @@ export class LicenseActivation {
    const claims=r?.envelope?JSON.parse(atob(r.envelope.payload)):null,now=Math.floor(Date.now()/1000);
    if(!r||r.revoked||r.keyHash!==b.keyHash||!claims||claims.expiresAt<=now||claims.notBefore>now)return Response.json({error:'License unavailable'},{status:403});
    if(r.deviceId&&r.deviceId!==b.deviceId)return Response.json({error:'Already activated on another device'},{status:409});
-   if(!r.deviceId){r.deviceId=b.deviceId;r.activatedAt=now;await tx.put('record',r);}
+   if(r.deviceId&&r.binding&&r.binding!==b.binding)return Response.json({error:'Activation binding changed'},{status:409});
+   if(r.deviceId&&r.publicKey&&r.publicKey!==b.publicKey)return Response.json({error:'Activation key changed'},{status:409});
+   if(!r.deviceId){r.deviceId=b.deviceId;r.binding=b.binding;r.publicKey=b.publicKey;r.activatedAt=now;await tx.put('record',r);}
+   else if(!r.binding||!r.publicKey){
+    // The previous Worker stored only deviceId. The Worker already verified a
+    // signature from the key whose public-key hash equals that same deviceId.
+    r={...r,binding:b.binding,publicKey:b.publicKey};await tx.put('record',r);
+   }
+  }
+  else if(b.action==='enable-offline'){
+   if(!r?.deviceId||r.deviceId!==b.deviceId||r.binding!=='software-cng-v1'||r.revoked)return Response.json({error:'Activation unavailable'},{status:403});
+   if(r.tpmDeviceId&&r.tpmDeviceId!==b.tpmDeviceId)return Response.json({error:'Offline device already bound'},{status:409});
+   r={...r,tpmDeviceId:b.tpmDeviceId,tpmPublicKey:b.tpmPublicKey,offlineUntil:b.offlineUntil,lastTpmCheck:b.checkedAt};await tx.put('record',r);
+  }
+  else if(b.action==='renew-offline'){
+   if(!r?.deviceId||r.revoked||r.tpmDeviceId&&r.tpmDeviceId!==b.tpmDeviceId||!r.tpmDeviceId&&(r.binding||'tpm-cng-v1')!=='tpm-cng-v1'||!r.tpmDeviceId&&r.deviceId!==b.tpmDeviceId)return Response.json({error:'Offline device unavailable'},{status:403});
+   r={...r,tpmDeviceId:b.tpmDeviceId,offlineUntil:b.offlineUntil,lastTpmCheck:b.checkedAt};await tx.put('record',r);
   }
   return Response.json(r||null);
  });}

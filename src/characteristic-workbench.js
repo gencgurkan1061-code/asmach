@@ -139,7 +139,26 @@
   const menuButton=form.querySelector('.cw-sections-button');inspectorTabs.nav.append(menuButton);menuButton.textContent='⋯';menuButton.title='Bölümleri aç / daralt';menuButton.setAttribute('aria-label','Bölüm seçenekleri');
   setupGdtFields();
   const surfaceInput=$('cwExtra_specialDesignator');
-  if(surfaceInput){const choices=el('datalist');choices.id='cwSurfaceParameters';for(const value of ['Ra','Rz','Rq','Rt','Rp','Rv','Rmax','RzJIS','RMS','CLA','RSm','Rsk','Rku','Wa','Wq','Wt','Pa','Pq','Pt']){const option=el('option');option.value=value;choices.append(option);}surfaceInput.setAttribute('list',choices.id);surfaceInput.placeholder='Ra, Rz…';surfaceInput.title='Yüzey parametresi; ölçü birimini ayrı Birim alanından seçin.';surfaceInput.after(choices);}
+  if(surfaceInput){
+   const values=['Ra','Rz','Rq','Rt','Rp','Rv','Rmax','RzJIS','RMS','CLA','RSm','Rsk','Rku','Wa','Wq','Wt','Pa','Pq','Pt'];
+   const picker=el('span','cw-surface-picker'),toggle=el('button','cw-surface-toggle','▾'),choices=el('div','cw-surface-options');
+   toggle.type='button';toggle.setAttribute('aria-label','Yüzey parametrelerini göster');toggle.setAttribute('aria-controls','cwSurfaceParameters');
+   choices.id='cwSurfaceParameters';choices.setAttribute('popover','auto');choices.setAttribute('role','listbox');choices.setAttribute('aria-label','Yüzey parametreleri');
+   surfaceInput.setAttribute('role','combobox');surfaceInput.setAttribute('aria-autocomplete','list');surfaceInput.setAttribute('aria-controls',choices.id);surfaceInput.setAttribute('aria-expanded','false');
+   surfaceInput.placeholder='Ra, Rz…';surfaceInput.title='Yüzey parametresi; ölçü birimini ayrı Birim alanından seçin.';
+   surfaceInput.replaceWith(picker);picker.append(surfaceInput,toggle);document.body.append(choices);
+   for(const value of values){const option=el('button','cw-surface-option',value);option.type='button';option.dataset.value=value;option.setAttribute('role','option');choices.append(option);option.addEventListener('click',()=>{choices.hidePopover();surfaceInput.value=value;surfaceInput.dispatchEvent(new Event('change',{bubbles:true}));surfaceInput.focus({preventScroll:true});});}
+   const filter=()=>{const query=surfaceInput.value.trim().toLocaleLowerCase('tr');for(const option of choices.children){option.hidden=!!query&&!option.dataset.value.toLocaleLowerCase('tr').startsWith(query);option.setAttribute('aria-selected',String(option.dataset.value===surfaceInput.value));}};
+   const position=()=>{const r=picker.getBoundingClientRect(),width=Math.max(190,r.width),height=Math.min(choices.scrollHeight,206);choices.style.width=width+'px';choices.style.left=Math.max(8,Math.min(r.left,innerWidth-width-8))+'px';choices.style.top=(r.bottom+4+height<=innerHeight? r.bottom+4:Math.max(8,r.top-height-4))+'px';};
+   const show=()=>{filter();if(!choices.matches(':popover-open'))choices.showPopover();position();};
+   surfaceInput.addEventListener('focus',show);surfaceInput.addEventListener('input',show);
+   surfaceInput.addEventListener('keydown',e=>{if(e.key==='Escape'&&choices.matches(':popover-open')){choices.hidePopover();e.stopPropagation();}else if(e.key==='ArrowDown'){e.preventDefault();show();choices.querySelector('.cw-surface-option:not([hidden])')?.focus();}});
+   choices.addEventListener('keydown',e=>{const visible=[...choices.querySelectorAll('.cw-surface-option:not([hidden])')],i=visible.indexOf(document.activeElement);if(e.key==='Escape'){choices.hidePopover();surfaceInput.focus();}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();visible[(i+(e.key==='ArrowDown'?1:-1)+visible.length)%visible.length]?.focus();}});
+   choices.addEventListener('toggle',()=>surfaceInput.setAttribute('aria-expanded',String(choices.matches(':popover-open'))));
+   window.addEventListener('resize',()=>{if(choices.matches(':popover-open'))position();});
+   $('selectionForm').querySelector('.ip-scroll')?.addEventListener('scroll',()=>{if(choices.matches(':popover-open'))position();},{passive:true});
+   toggle.addEventListener('click',()=>{if(choices.matches(':popover-open'))choices.hidePopover();else{show();surfaceInput.focus({preventScroll:true});}});
+  }
   setupStandards();
   setupCalloutFields();
   const hint=$('ciNumberHint');hint.title='Balon numarasını Uygula ile kaydedin. İlk boş no kullanılmayan numarayı önerir.';
@@ -158,6 +177,7 @@
   $('cwAngleFormatField').hidden=record.type!=='Açı';angleMode.value=record.angleFormat||'decimal';
   for(const key of ['nominalValue','lowerTolerance','upperTolerance']){const input=$(key);input.setCustomValidity('');input.inputMode=record.type==='Açı'?'text':'decimal';input.placeholder=record.type==='Açı'&&record.angleFormat==='dms'?'0° 0′ 0″':'';if(record.type==='Açı'&&record.angleFormat==='dms')input.value=root.ASMachRequirements.formatAngle(record[key]);}
   const type=record.type,profile=root.ASMachRequirements.fieldProfile(type),form=$('selectionForm');
+  if(type!=='Yüzey'&&$('cwSurfaceParameters')?.matches(':popover-open'))$('cwSurfaceParameters').hidePopover();
   form.dataset.characteristicType=type;
   $('measurementUnit').closest('.field').hidden=!profile.unit;
   for(const [key,,types] of extraSpecs){const input=$('cwExtra_'+key);input.closest('.field').hidden=!types.includes(type);const value=String(record[key]??'');
@@ -311,6 +331,7 @@
  }
  const css=`
  .cw-tab-hidden{display:none!important}.cw-tabs{display:flex;gap:3px;align-items:center;padding:7px 8px;background:#fff;border-bottom:1px solid #d7e2ea;flex-shrink:0}.cw-tabs>.btn{font:600 12px 'Segoe UI',sans-serif;min-height:32px;padding:5px 11px;border:1px solid transparent;background:transparent;color:#5a7080;border-radius:5px;white-space:nowrap}.cw-tabs>.btn[aria-selected=true]{color:#087c8e;background:#e7f5f8;border-color:#b9dfe5}.cw-tabs button:focus-visible,.cw-menu button:focus-visible{outline:2px solid #00899b;outline-offset:-2px}.cw-menu[popover]{position:fixed;inset:auto;margin:0;width:212px;padding:5px;background:#fff;border:1px solid #c6d7e0;border-radius:7px;box-shadow:0 7px 24px #16384c24;color:#284c61}.cw-menu .btn{display:flex;width:100%;text-align:left;justify-content:flex-start;border:0;background:white;min-height:32px;font-size:12px}.cw-menu .btn:hover{background:#edf6f9}
+ .cw-surface-picker{display:flex;align-items:center;min-width:0;position:relative}.cw-surface-picker input{width:100%;min-width:0;padding-right:22px!important}.cw-surface-picker .cw-surface-toggle{position:absolute;right:1px;top:1px;bottom:1px;width:22px;padding:0;border:0;background:transparent;color:#2c596e;font:12px 'Segoe UI',sans-serif;cursor:pointer}.cw-surface-picker .cw-surface-toggle:hover{background:#e7f3f7}.cw-surface-options[popover]{position:fixed;inset:auto;margin:0;max-height:206px;overflow:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:5px;background:#fff;border:1px solid #b9d2df;border-radius:5px;box-shadow:0 8px 22px #1b3c5133;color:#24495d;font:11px 'Segoe UI',sans-serif}.cw-surface-options:not(:popover-open){display:none}.cw-surface-option{min-height:26px;padding:4px 7px;text-align:left;border:0;border-radius:3px;background:transparent;color:inherit;font:inherit;cursor:pointer}.cw-surface-option:hover,.cw-surface-option:focus-visible{background:#e7f4f8;outline:0}.cw-surface-option[aria-selected=true]{background:#d7eef4;color:#075f74;font-weight:700}.cw-surface-option[hidden]{display:none}
  html body #selectionForm.cw-inspector .ci-number>label{grid-column:1;grid-row:1}html body #selectionForm.cw-inspector .ci-number>input{grid-column:2;grid-row:1}html body #selectionForm.cw-inspector .ci-number>#ciNumberApply{grid-column:3;grid-row:1}html body #selectionForm.cw-inspector .ci-number>#ciNumberFree{grid-column:4;grid-row:1}html body #selectionForm.cw-inspector .ci-number>.ci-number-hint{grid-column:1/-1;grid-row:2}
  html body .cw-editor .modal-head,html body .cw-editor .acui-head,html body .cw-editor .modal-head h3,html body .cw-editor .acui-head h2{color:#1c3e53!important}html body .cw-editor .acui-eyebrow{color:#588094!important}html body .cw-editor .cw-window-actions .btn,html body .cw-editor .acui-close{color:#385d73!important;background:#f4f8fa!important;border:1px solid #c8dbe6!important}html body .cw-editor .cw-validation{flex-shrink:0;max-height:100px;overflow:auto;margin:8px 12px 0;padding:8px 10px}
  .snapshot-view-tools{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin:7px 0}.snapshot-view-tools output{min-width:37px;text-align:center;color:#526f83;font-size:11px}.cw-editor .snapshot-actions{flex-wrap:wrap}.cw-editor .snapshot-controls small:after{content:' · Ctrl + tekerlek: yakınlaştır · Alt + sürükle: kaydır'}

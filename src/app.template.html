@@ -4733,6 +4733,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           const expectedMeasurementType=contentMode==='dimension'?(queueContext?.measurementType??document.querySelector('#boxMeasurementType')?.value??''):'';
           const sourceAtStart=state.fileData,pageAtStart=state.currentPage;
           const fresh=Boolean(candidateReview?.recognizeFresh);
+          const initialOcrMode=(!existing||fresh)?(state.metadata?.projectDefaults?.newRecordOcrMode||'strong'):null;
           const projectTolerance=state.generalTolerance?.standard||'';
           if(projectTolerance&&(!existing||fresh)&&[...elements.ocrGeneralTolerance.options].some(option=>option.value===projectTolerance))elements.ocrGeneralTolerance.value=projectTolerance;
           document.querySelector('#ocrReferenceLength').value=fresh?'':existing?.referenceLength||'';
@@ -4786,10 +4787,10 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             const candidates = pdfText
               ? [{ text: pdfText, source: "PDF metin katmanı", confidence: 100 }]
               : [];
-            if (snapshot && (detectedSelection?.frame || !isReliableTechnicalText(pdfText) || parseTechnicalRequirement(pdfText).type === 'Uzunluk' || window.ASMachRequirements?.measurementIntentScore?.(pdfText,expectedMeasurementType,parseTechnicalRequirement(pdfText))<0)) {
+            if (snapshot && (initialOcrMode==='strong' || detectedSelection?.frame || !isReliableTechnicalText(pdfText) || parseTechnicalRequirement(pdfText).type === 'Uzunluk' || window.ASMachRequirements?.measurementIntentScore?.(pdfText,expectedMeasurementType,parseTechnicalRequirement(pdfText))<0)) {
               if(queueContext?.nonBlocking){state.boxRecognitionDetail='OCR motoru ölçü ve toleransları okuyor';updateBoxRecognitionStatus();}
               else setBusyDetail("OCR motoru ölçü ve toleransları okuyor");
-              const ocrResult = await recognizeSnapshotAutomatically(recognitionSnapshot,{skipGdt:noteMode,textMode:noteMode,expectedMeasurementType,nonBlocking:Boolean(queueContext?.nonBlocking)});
+              const ocrResult = await recognizeSnapshotAutomatically(recognitionSnapshot,{skipGdt:noteMode,textMode:noteMode,expectedMeasurementType,nonBlocking:Boolean(queueContext?.nonBlocking),...(initialOcrMode?{enhancement:initialOcrMode}:{})});
               if(!noteMode&&!detectedSelection?.frame&&!Number.isFinite(angleHint)&&Number.isFinite(ocrResult.angle)&&ocrResult.confidence>=65&&window.ASMachAutoSelection){
                 const readingAngle=(detectedSelection?.rect.angle||0)-ocrResult.angle;
                 try{detectedSelection=await window.ASMachAutoSelection.inspect(snapshot,initialRect,{angleHint:readingAngle,paddingRatio:paddingRatioFor(recognitionMethod)});recognitionSnapshot=detectedSelection.snapshot;}catch{}
@@ -7354,6 +7355,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           const legacySize = [18, 23, 29].includes(Number(input.size)) && input.opacity == null;
           const requestedSize = legacySize ? Number(input.size) * 2 : Number(input.size);
           const type = window.ASMachRequirements?.normalizeType(input.type || "Uzunluk") || String(input.type || "Uzunluk");
+          const obsoleteDiameterWarning=type==='Çap'&&String(input.ocrReviewReason||'')==='Okumalar farklı veya rakam yerleşimi şüpheli. Nominal ve toleransları kaynak görüntüyle karşılaştırın.';
           const evaluationMethod = ["VALUE", "OK_NOT_OK"].includes(input.evaluationMethod)
             ? input.evaluationMethod
             : ["Diş", "Geçme", "Not", "Görsel"].includes(type)
@@ -7436,8 +7438,8 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             detectionConfidence: input.detectionConfidence == null ? null : clamp(Number(input.detectionConfidence) || 0, 0, 100),
             candidateReviewStatus: ['corrected','approved','rejected'].includes(input.candidateReviewStatus)?input.candidateReviewStatus:'',
             originalOcrText: String(input.originalOcrText||''),
-            ocrNeedsReview: input.ocrNeedsReview === true,
-            ocrReviewReason: String(input.ocrReviewReason||''),
+            ocrNeedsReview: input.ocrNeedsReview === true&&!obsoleteDiameterWarning,
+            ocrReviewReason: obsoleteDiameterWarning?'':String(input.ocrReviewReason||''),
             sourceTextHeight: input.sourceTextHeight == null ? null : clamp(Number(input.sourceTextHeight) || 0, 0, 500),
             ocrAutoSized: input.ocrAutoSized === true,
             newRecordAppearance: input.newRecordAppearance && typeof input.newRecordAppearance==='object' ? Object.fromEntries(Object.entries(input.newRecordAppearance).filter(([k,v])=>['size','fontSize'].includes(k)?Number.isFinite(v):k==='arrowEnabled'?typeof v==='boolean':k==='boxLineStyle'?['solid','none'].includes(v):false)) : null,
