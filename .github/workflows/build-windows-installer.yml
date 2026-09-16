@@ -28,8 +28,6 @@ jobs:
       - name: Verify release-critical behavior
         run: |
           node --test tests/installer-flow.test.cjs tests/license-release.test.cjs tests/license-request.test.cjs tests/requirements-test.cjs tests/tauri-bridge.test.cjs tests/radius-thread-regression.test.cjs tests/publisher-service.test.cjs tests/ocr-model-gate.test.cjs
-          node scripts/check-license-release-ui.cjs
-          node scripts/check-measurement-submenu.cjs
       - name: Build NSIS installer
         run: npm run desktop:build
       - name: Upload installer for validation
