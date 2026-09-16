@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "asmach-release",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-15",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "UPDATE_PUBLIC_KEY": "Nr007C6NfxVB0duXMqDua4QwKsy3h1HyeHRksXkgjB8="
+  },
+  "kv_namespaces": [
+    {
+      "binding": "RELEASES_KV",
+      "id": "6eca6bd327914a60b0e0a34a166e3ad0"
+    }
+  ]
+}

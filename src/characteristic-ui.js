@@ -27,8 +27,8 @@
     { value: "pass", label: "Uygun" },
     { value: "fail", label: "Uygun değil" },
   ];
-  const editableFields = ["number", "page", "sheetNo", "zone", "type", "requirement", "nominalValue", "unit", "lowerTolerance", "upperTolerance", "lowerLimit", "upperLimit", "evaluationMethod", "inspectionMethod", "status", "result", "datumRefs", "specialDesignator", "nonconformanceNo", "comment", "toleranceStandard", "gdtSubtype", "fitClass", "threadPitch", "threadClass"];
-  const parsedFields = ["type", "nominalValue", "lowerTolerance", "upperTolerance", "lowerLimit", "upperLimit", "unit", "evaluationMethod", "toleranceStandard", "datumRefs", "gdtSubtype", "fitClass", "threadPitch", "threadClass"];
+  const editableFields = ["number", "page", "sheetNo", "zone", "type", "requirement", "nominalValue", "unit", "lowerTolerance", "upperTolerance", "lowerLimit", "upperLimit", "evaluationMethod", "inspectionMethod", "status", "result", "datumRefs", "specialDesignator", "nonconformanceNo", "comment", "toleranceStandard", "gdtSubtype", "fitClass", "threadPitch", "threadClass", "threadStandard"];
+  const parsedFields = ["type", "nominalValue", "lowerTolerance", "upperTolerance", "lowerLimit", "upperLimit", "unit", "evaluationMethod", "toleranceStandard", "datumRefs", "gdtSubtype", "fitClass", "threadPitch", "threadClass", "threadStandard"];
   editableFields.push('inspectionFrequency','frequencyInterval','frequencyNote');
   const numericFields = ["nominalValue", "lowerTolerance", "upperTolerance", "lowerLimit", "upperLimit"];
   const $ = (selector, parent = document) => parent.querySelector(selector);
@@ -269,7 +269,7 @@
           ${input("nominalValue", "NOMİNAL", "", 'inputmode="decimal"')}${input("unit", "BİRİM", "", 'list="acuiUnits"')}${input("lowerTolerance", "ALT TOLERANS", "", 'inputmode="decimal" placeholder="−0.1"')}${input("upperTolerance", "ÜST TOLERANS", "", 'inputmode="decimal" placeholder="+0.1"')}
           ${input("lowerLimit", "ALT LİMİT", "", 'inputmode="decimal"')}${input("upperLimit", "ÜST LİMİT", "", 'inputmode="decimal"')}${input("toleranceStandard", "TOLERANS KAYNAĞI", "acui-span2", 'placeholder="Örn. ISO 2768-mK"')}
         </div><div class="acui-actions"><button class="btn" id="acuiRecalculateLimits" type="button">Limitleri toleranstan hesapla</button><span class="acui-subtle">Açıkça belirtilen tolerans önceliklidir.</span></div>
-        <div class="acui-grid" id="acuiThreadFields" style="margin-top:9px">${input("threadPitch", "DİŞ ADIMI", "", 'inputmode="decimal"')}${input("threadClass", "DİŞ SINIFI")}${input("fitClass", "GEÇME SINIFI", "acui-span2")}</div></section>
+        <div class="acui-grid" id="acuiThreadFields" style="margin-top:9px">${input("threadPitch", "DİŞ ADIMI", "", 'inputmode="decimal"')}${input("threadClass", "DİŞ SINIFI")}${input("threadStandard", "DİŞ STANDARDI", "acui-span2", 'placeholder="OCR otomatik belirler"')}${input("fitClass", "GEÇME SINIFI", "acui-span2")}</div></section>
         <section class="acui-section" id="acuiGdtSection"><h3>GD&amp;T ve datum</h3><div class="acui-grid">${select("gdtSubtype", "GD&T TÜRÜ", "acui-span2", options(engine().gdtOptions?.() || []))}${input("datumRefs", "DATUM REFERANSLARI", "acui-span2", 'placeholder="A | B | C"')}</div><div id="acuiDatumColumns" class="acui-grid" style="grid-template-columns:repeat(3,minmax(0,1fr));margin-top:8px">${[0,1,2].map(i=>`<label class="acui-field"><span>${i+1}. DATUM</span><input data-datum-slot="${i}" placeholder="${['A','B','C'][i]}"></label>`).join('')}</div><p class="acui-subtle">Tür ve datum değişiklikleri rapor çerçevesine aktarılır. Kaynak görüntüsü değişmez.</p><div id="acuiGdtFrame" class="acui-gdt" aria-label="Geometrik tolerans çerçevesi"></div><img id="acuiGdtReportImage" alt="Üretilen rapor çerçevesi" style="height:28px;max-width:100%;object-fit:contain;object-position:left;margin-top:8px" hidden></section>
         <section class="acui-section" id="acuiControlSection"><h3>Değerlendirme / önceki kontrol bilgileri</h3><div class="acui-grid">
           ${select("inspectionMethod", "KONTROL YÖNTEMİ", "acui-span2")}${select("evaluationMethod", "DEĞERLENDİRME", "acui-span2", options([{ value: "VALUE", label: "Sayısal değer" }, { value: "OK_NOT_OK", label: "OK / NOT OK" }]))}
@@ -292,7 +292,7 @@
     const reviewWarnings=document.createElement('section');reviewWarnings.id='acuiWarningReview';reviewWarnings.className='acui-section';reviewWarnings.innerHTML='<h3>Algılama uyarılarını doğrula</h3><div id="acuiWarningText" style="white-space:pre-line;font-size:12px;line-height:1.6"></div><label style="display:flex;gap:8px;font-size:12px;margin-top:8px"><input id="acuiConfirmWarnings" type="checkbox">Kaynak resmi ve düzelttiğim değerleri kontrol ettim; aşağıdaki kaydı bu haliyle doğruluyorum.</label><small>Bu onay eksik toleransları veya çelişkili limitleri geçerli yapmaz. GD&T toleransı ± boyut sapması olarak değerlendirilmez.</small>';$('#acuiEditor .acui-editor-main').prepend(reviewWarnings);
     const legacy=document.createElement('details');legacy.className='acui-secondary acui-legacy';legacy.innerHTML='<summary>Önceki kontrol bilgileri / ölçüm sonucu</summary>';$('#acuiControlSection').before(legacy);legacy.append($('#acuiControlSection'));
     const general=document.createElement('div');general.id='acuiGeneralApply';general.innerHTML=`<label class="acui-field"><span>GENEL TOLERANS</span><select id="acuiRecordStandard">${window.ASMachCharacteristicEditing?.options(window.ASMachCharacteristicEditing.standards)||''}</select></label><label class="acui-field" id="acuiReferenceField" hidden><span>KISA KENAR (mm)</span><input id="acuiReferenceLength" type="number" min="0" step="any"></label><label class="acui-check"><input id="acuiReplaceTolerance" type="checkbox">Mevcut toleransları değiştir</label><button type="button" class="btn" id="acuiApplyGeneral">Genel toleransı uygula</button><small id="acuiGeneralMessage" role="status"></small>`;$('#acuiNumericSection').insertBefore(general,$('#acuiNumericSection').children[1]);
-    $('#acuiApplyGeneral').onclick=()=>{const result=window.ASMachCharacteristicEditing.general(readEditor(),$('#acuiRecordStandard').value,bridge.parseRequirement,$('#acuiReferenceLength').value,$('#acuiReplaceTolerance').checked);if(!result.patch){$('#acuiGeneralMessage').textContent=result.reason;return;}Object.assign(parsedMetadata,result.patch);for(const [key,value] of Object.entries(result.patch)){if(field(key)){field(key).value=value??'';manualFields.delete(key);delete field(key).dataset.manual;}}updateEditorDisplay();$('#acuiGeneralMessage').textContent='Toleranslar ve limitler hesaplandı. Kaydetmeden önce kontrol edin.';};
+    $('#acuiApplyGeneral').onclick=()=>{const result=window.ASMachCharacteristicEditing.general(readEditor(),$('#acuiRecordStandard').value,bridge.parseRequirement,$('#acuiReferenceLength').value,$('#acuiReplaceTolerance').checked);if(!result.patch){$('#acuiGeneralMessage').textContent=result.reason;return;}Object.assign(parsedMetadata,result.patch);for(const [key,value] of Object.entries(result.patch)){if(field(key)){field(key).value=value??'';manualFields.delete(key);delete field(key).dataset.manual;}}enableEditorRequirementAuto();updateEditorDisplay();$('#acuiGeneralMessage').textContent='Toleranslar ve limitler hesaplandı. Kaydetmeden önce kontrol edin.';};
     bindDialog(editor);
     $('#acuiEditRegion').addEventListener('click',()=>editRegion(false));
     $('#acuiReselectRegion').addEventListener('click',()=>editRegion(true));
@@ -311,7 +311,7 @@
     $("#acuiParse").addEventListener("click", regenerate);
     $("#acuiReadSource").addEventListener("click", () => parseEditor(true));
     $("#acuiAutoParse").addEventListener("change", () => { if ($('#acuiAutoParse').checked) regenerate(); else updateEditorDisplay(); });
-    $("#acuiRecalculateLimits").addEventListener("click", () => { recalculateLimits(true); updateEditorDisplay(); });
+    $("#acuiRecalculateLimits").addEventListener("click", () => { recalculateLimits(true); enableEditorRequirementAuto(); updateEditorDisplay(); });
     $("#acuiBinaryResultSelect").addEventListener("change", event => { field("result").value = event.target.value; manualFields.add("result"); updateEditorDisplay(); });
     $("#acuiFocusDrawing").addEventListener("click", () => { closeDialog(editor); bridge.focusAnnotation?.(editorId); });
     $("#acuiDelete").addEventListener("click", () => { const id = editorId; closeDialog(editor); bridge.removeAnnotation?.(id); });
@@ -319,7 +319,7 @@
       if(event.target.dataset.datumSlot!==undefined){
         const values=engine().datumTokens(field('datumRefs').value),index=Number(event.target.dataset.datumSlot);
         while(values.length<=index)values.push('');values[index]=event.target.value.trim().toUpperCase();
-        field('datumRefs').value=engine().datumTokens(values.join(' | ')).join(' | ');manualFields.add('datumRefs');updateEditorDisplay();return;
+        field('datumRefs').value=engine().datumTokens(values.join(' | ')).join(' | ');manualFields.add('datumRefs');enableEditorRequirementAuto();updateEditorDisplay();return;
       }
       const name = event.target.dataset.characteristicField;
       if (!name || parsing) return;
@@ -332,10 +332,10 @@
       if(name==='type'&&event.target.value==='Not'){
         field('evaluationMethod').value='OK_NOT_OK';manualFields.add('evaluationMethod');
         if(!['','OK','NOT_OK'].includes(field('result').value))field('result').value='';
-        $('#acuiAutoParse').checked=false;
       }
       event.target.dataset.manual = "true";
       if (name === 'requirement') $('#acuiAutoParse').checked=false;
+      else if([...parsedFields,'specialDesignator'].includes(name))enableEditorRequirementAuto();
       if (["nominalValue", "lowerTolerance", "upperTolerance"].includes(name)) recalculateLimits(false);
       if (name === "evaluationMethod") {
         const raw = field("result").value;
@@ -351,7 +351,7 @@
     metadata.style.width = "min(780px,calc(100vw - 36px))";
     metadata.setAttribute("aria-labelledby", "acuiMetadataTitle");
     const metadataField = (name, label, extra = "") => `<label class="acui-field ${extra}"><span>${label}</span><input data-metadata-field="${name}"></label>`;
-    metadata.innerHTML = `<header class="acui-head"><div><div class="acui-eyebrow">PROJE BİLGİLERİ</div><h2 id="acuiMetadataTitle">Teknik resim ve genel tolerans</h2></div><button class="acui-close" data-close-dialog type="button" aria-label="Pencereyi kapat">×</button></header><form id="acuiMetadataForm" class="acui-content"><div class="acui-kpis" id="acuiMetadataKpis"></div><section class="acui-section"><h3>Çizim kimliği</h3><div class="acui-grid">${metadataField("drawingNo", "TEKNİK RESİM NO", "acui-span2")}${metadataField("drawingRevision", "ÇİZİM REVİZYONU")}${metadataField("partRevision", "PARÇA REVİZYONU")}${metadataField("partNo", "PARÇA NO", "acui-span2")}${metadataField("customer", "MÜŞTERİ", "acui-span2")}${metadataField("preparedBy", "HAZIRLAYAN", "acui-span2")}<label class="acui-field acui-span2"><span>ÇİZİM DURUMU</span><select data-metadata-field="status"><option value="draft">Taslak</option><option value="in_review">İncelemede</option><option value="approved">Onaylandı</option><option value="archived">Arşiv</option></select></label><label class="acui-field acui-full"><span>AÇIKLAMA</span><textarea rows="2" data-metadata-field="description"></textarea></label></div></section><section class="acui-section"><h3>Belirtilmemiş toleransların varsayılanı</h3><div class="acui-grid"><label class="acui-field acui-span2"><span>GENEL TOLERANS STANDARDI</span><select id="acuiGeneralStandard"><option value="">Otomatik tolerans uygulama</option>${["f", "m", "c", "v"].flatMap(linear => ["H", "K", "L"].map(geometric => `<option value="ISO 2768-${linear}${geometric}">ISO 2768-${linear}${geometric}</option>`)).join("")}<option value="CUSTOM">Özel alt / üst tolerans</option></select></label><label class="acui-field"><span>ÖZEL ALT TOLERANS</span><input id="acuiGeneralLower" inputmode="decimal" placeholder="−0.1"></label><label class="acui-field"><span>ÖZEL ÜST TOLERANS</span><input id="acuiGeneralUpper" inputmode="decimal" placeholder="+0.1"></label></div><p>Bu seçim yeni algılamalara uygulanır. Mevcut kayıtlar ve açıkça verilmiş toleranslar korunur. Geometrik H/K/L sınıfı sadece desteklenen özelliklere uygulanır.</p></section><section class="acui-section"><div class="acui-actions" style="margin:0"><div><h3 style="margin:0">İşlem geçmişi</h3><p>Projeyle birlikte kaydedilen yerel değişiklik günlüğü</p></div><button class="btn" type="button" id="acuiAuditOpen">Geçmişi görüntüle</button></div></section></form><footer class="acui-foot"><button class="btn" type="button" data-close-dialog>Vazgeç</button><button class="btn primary" type="submit" form="acuiMetadataForm">Bilgileri kaydet</button></footer>`;
+    metadata.innerHTML = `<header class="acui-head"><div><div class="acui-eyebrow">PROJE BİLGİLERİ</div><h2 id="acuiMetadataTitle">Teknik resim ve genel tolerans</h2></div><button class="acui-close" data-close-dialog type="button" aria-label="Pencereyi kapat">×</button></header><form id="acuiMetadataForm" class="acui-content"><div class="acui-kpis" id="acuiMetadataKpis"></div><section class="acui-section"><h3>Çizim kimliği</h3><div class="acui-grid">${metadataField("drawingNo", "TEKNİK RESİM NO", "acui-span2")}${metadataField("drawingRevision", "ÇİZİM REVİZYONU")}${metadataField("partRevision", "PARÇA REVİZYONU")}${metadataField("partNo", "PARÇA NO", "acui-span2")}${metadataField("customer", "MÜŞTERİ", "acui-span2")}${metadataField("preparedBy", "HAZIRLAYAN", "acui-span2")}<label class="acui-field acui-span2"><span>ÇİZİM DURUMU</span><select data-metadata-field="status"><option value="draft">Taslak</option><option value="in_review">İncelemede</option><option value="approved">Onaylandı</option><option value="archived">Arşiv</option></select></label><label class="acui-field acui-full"><span>AÇIKLAMA</span><textarea rows="2" data-metadata-field="description"></textarea></label></div></section><section class="acui-section"><h3>Belirtilmemiş toleransların varsayılanı</h3><div class="acui-grid"><label class="acui-field acui-span2"><span>GENEL TOLERANS STANDARDI</span><select id="acuiGeneralStandard"><option value="">Otomatik tolerans uygulama</option>${["f", "m", "c", "v"].flatMap(linear => ["H", "K", "L"].map(geometric => `<option value="ISO 2768-${linear}${geometric}">ISO 2768-${linear}${geometric}</option>`)).join("")}<option value="ASME Y14.5-2018">ASME Y14.5-2018 · çizim alt/üst sapmaları</option><option value="ASME Y14.5-2009">ASME Y14.5-2009 · çizim alt/üst sapmaları</option><option value="CUSTOM">Özel alt / üst tolerans</option></select></label><label class="acui-field"><span>ÖZEL ALT TOLERANS</span><input id="acuiGeneralLower" inputmode="decimal" placeholder="−0.1"></label><label class="acui-field"><span>ÖZEL ÜST TOLERANS</span><input id="acuiGeneralUpper" inputmode="decimal" placeholder="+0.1"></label></div><p>ASME seçiminde evrensel sayısal tolerans atanmaz; çizimdeki doğrusal alt/üst sapmaları girin. Bu seçim yeni algılamalara uygulanır. Mevcut kayıtlar ve açıkça verilmiş toleranslar korunur. Geometrik H/K/L sınıfı sadece desteklenen özelliklere uygulanır.</p></section><section class="acui-section"><div class="acui-actions" style="margin:0"><div><h3 style="margin:0">İşlem geçmişi</h3><p>Projeyle birlikte kaydedilen yerel değişiklik günlüğü</p></div><button class="btn" type="button" id="acuiAuditOpen">Geçmişi görüntüle</button></div></section></form><footer class="acui-foot"><button class="btn" type="button" data-close-dialog>Vazgeç</button><button class="btn primary" type="submit" form="acuiMetadataForm">Bilgileri kaydet</button></footer>`;
     document.body.append(metadata);
     bindDialog(metadata);
     $("#acuiMetadataForm").addEventListener("submit", saveMetadata);
@@ -714,35 +714,28 @@
     }
   }
 
+  function enableEditorRequirementAuto() {
+    manualFields.delete('requirement');delete field('requirement').dataset.manual;
+    $('#acuiAutoParse').checked=true;
+  }
+
   function transitionEditorType(type) {
     const previous=field('type').dataset.previousType;
     field('type').dataset.previousType=type;
     if(previous===type)return;
-    if(!['Uzunluk','Çap','Yarıçap','Pah','Tolerans'].includes(type)||!['Uzunluk','Çap','Yarıçap','Pah','Tolerans'].includes(previous)){parsedMetadata.limitDimension=false;parsedMetadata.nominalSource='';regionDraft.limitDimension=false;regionDraft.nominalSource='';}
-    const clear=name=>{if(field(name)){field(name).value='';manualFields.add(name);}};
-    const oldFit=field('fitClass').value;
-    const source=field('toleranceStandard').value;
-    const incompatibleFit=type!=='Geçme'&&(oldFit||/ISO\s*286/i.test(source));
-    const incompatibleGeometry=(previous==='Açı')!==(type==='Açı')||(previous==='GD&T')!==(type==='GD&T');
-    if(type!=='Geçme')clear('fitClass');
-    if(type!=='Diş'){clear('threadPitch');clear('threadClass');}
-    if(!['GD&T','Datum','Tolerans'].includes(type)){
-      clear('gdtSubtype');clear('datumRefs');
-      parsedMetadata.gdtFrame=null;regionDraft.gdtFrame=null;
-    }
-    if(incompatibleFit||incompatibleGeometry){
-      for(const name of ['lowerTolerance','upperTolerance','lowerLimit','upperLimit','toleranceStandard'])clear(name);
-      // Clearing obsolete deviations does not create a new explicit tolerance.
-      manualFields.delete('lowerTolerance');manualFields.delete('upperTolerance');
-      parsedMetadata.toleranceExplicit=false;regionDraft.toleranceExplicit=false;
-      $('#acuiReferenceLength').value='';
-    }
-    const unit=root.ASMachCharacteristicEditing.defaultUnitForType(type,state().generalTolerance?.unit),control=field('unit');
+    const draft={...state().annotations.find(item=>item.id===editorId),...parsedMetadata,...regionDraft};
+    editableFields.forEach(name=>{if(field(name))draft[name]=field(name).value.trim();});
+    let cleaned=engine().transitionType({...draft,type:previous,manualFields:[...manualFields]},type);
+    cleaned.unit=window.ASMachCharacteristicEditing.defaultUnitForType(type,state().generalTolerance?.unit);
+    cleaned=window.ASMachCharacteristicEditing.refreshGeneral(cleaned,state().generalTolerance,bridge.parseRequirement);
+    for(const name of [...parsedFields,'specialDesignator'])if(field(name)){field(name).value=valueString(cleaned[name]);if(String(draft[name]??'')!==String(cleaned[name]??''))manualFields.add(name);}
+    for(const key of ['gdtFrame','callout','surfaceTexture','chamferAngle','chamferAngleTolerance','angleFormat','nominalSource','limitDimension','toleranceExplicit','lowerInclusive','upperInclusive']){parsedMetadata[key]=cleaned[key];regionDraft[key]=cleaned[key];}
+    if(!cleaned.toleranceExplicit)for(const key of ['lowerTolerance','upperTolerance','lowerLimit','upperLimit'])manualFields.delete(key);
+    $('#acuiReferenceLength').value=cleaned.referenceLength||'';
+    const unit=window.ASMachCharacteristicEditing.defaultUnitForType(type,state().generalTolerance?.unit),control=field('unit');
     if(control.tagName==='SELECT'&&![...control.options].some(o=>o.value===unit))control.add(new Option(unit||'—',unit));
     control.value=unit;manualFields.add('unit');
-    const profile=engine().fieldProfile?.(type);
-    if(profile&&!profile.numeric){for(const name of [...numericFields,'unit','toleranceStandard'])clear(name);}
-    if(type==='GD&T')clear('nominalValue');
+    enableEditorRequirementAuto();
   }
 
   function readEditor() {
@@ -764,7 +757,7 @@
     if(updated.type==='GD&T')updated.nominalValue='';
     if (updated.evaluationMethod === "VALUE" && finiteNumber(updated.result)) updated.result = normalizedNumber(updated.result);
     const framed = engine().withGdtSubtype ? engine().withGdtSubtype(updated) : updated;
-    return engine().syncRequirement ? engine().syncRequirement({...framed, manualFields:[...manualFields]}) : framed;
+    return engine().syncRequirement ? engine().syncRequirement({...framed, manualFields:[...manualFields]},false,{clearIncomplete:true}) : framed;
   }
 
   function parseEditor(explicit) {
@@ -783,6 +776,7 @@
         field(name).value = valueString(parsed[name]);
       });
       parsedMetadata = {
+        measurementEvidence: parsed.measurementEvidence,
         nominalSource: manualFields.has('nominalValue')?'manual':parsed.nominalSource||'',
         limitDimension: parsed.limitDimension===true&&!manualFields.has('lowerTolerance')&&!manualFields.has('upperTolerance'),
         decimalPlaces: parsed.decimalPlaces,
@@ -800,7 +794,7 @@
       const warnings = Array.isArray(parsed.parseWarnings) ? parsed.parseWarnings : [];
       $("#acuiValidation").textContent = warnings.join("\n");
       $("#acuiParsingNote").textContent = protectedCount ? `${protectedCount} elle düzenlenmiş alan korundu. Gerekiyorsa bu değerleri doğrudan güncelleyebilirsiniz.` : "Ölçü türü, nominal ve tolerans alanları metinden algılandı. Kaydetmeden önce kontrol edin.";
-      if (explicit) bridge.toast?.("Gereklilik metni yeniden değerlendirildi; manuel alanlar korundu.");
+      if (explicit) { enableEditorRequirementAuto();bridge.toast?.("Kaynak yeniden değerlendirildi; manuel ölçü alanları korundu ve gereklilik yenilendi."); }
       updateEditorDisplay();
     } finally { parsing = false; }
   }
@@ -834,6 +828,8 @@
         delete field(limitName).dataset.manual;
       }
     }
+    const updated=window.ASMachCharacteristicEditing.preserveSurfaceBound(base,{...base,nominalValue:nominal,lowerTolerance:field('lowerTolerance').value,upperTolerance:field('upperTolerance').value,lowerLimit:field('lowerLimit').value,upperLimit:field('upperLimit').value});
+    field('lowerLimit').value=updated.lowerLimit??'';field('upperLimit').value=updated.upperLimit??'';
   }
 
   function updateEditorDisplay() {
@@ -843,7 +839,7 @@
     checks.innerHTML=`<strong>${issues.length?`${issues.length} bilgi kontrolü`:'Karakteristik bilgileri tamam'}</strong><p>Kontrol planı bilgilerini denetler; ölçüm sonucu veya onay durumu istemez. Eksik kayıtlar taslak olarak saklanabilir.</p>${issues.length?`<ul>${issues.map(i=>`<li><button type="button" data-information-field="${escape(i.field)}">${escape(i.label)}</button></li>`).join('')}</ul>`:''}`;
     checks.onclick=event=>{const name=event.target.dataset.informationField;if(name){field(name)?.scrollIntoView({block:'center'});field(name)?.focus();}};
     if ($('#acuiAutoParse').checked) field('requirement').value = record.requirement;
-    $('#acuiParsingNote').textContent = $('#acuiAutoParse').checked ? 'Otomatik: tür, nominal ve tolerans alanlarını takip eder. Yazarsanız manuel moda geçer.' : 'Manuel: metniniz korunur; gereklilik düzenlemesi ölçü alanlarını değiştirmez.';
+    $('#acuiParsingNote').textContent = $('#acuiAutoParse').checked ? 'Otomatik: tür, nominal, tolerans ve türe özel alanları takip eder.' : 'Manuel: metniniz korunur. Bir ölçü alanını değiştirirseniz gereklilik yeniden otomatik oluşturulur.';
     const profile = engine().fieldProfile?.(record.type);
     const textual = profile ? !profile.numeric : ["Not", "Teknik not", "Malzeme", "Proses", "Datum", "Görsel", "Diğer"].includes(record.type);
     field('frequencyInterval').closest('.acui-field').hidden=!['EVERY_N_PIECES','EVERY_N_HOURS'].includes(record.inspectionFrequency);
@@ -864,7 +860,7 @@
     [0,1,2].forEach(i=>{const input=$(`[data-datum-slot="${i}"]`);if(document.activeElement!==input)input.value=datums[i]||'';});
     const report=window.ASMachGdtReport?.render(record),reportImage=$('#acuiGdtReportImage');reportImage.hidden=!report;if(report)reportImage.src=report.dataUrl;
     $("#acuiThreadFields").hidden = !["Diş", "Geçme"].includes(record.type) && !record.fitClass;
-    for (const name of ['threadPitch', 'threadClass']) field(name).closest('.acui-field').hidden = record.type !== 'Diş';
+    for (const name of ['threadPitch', 'threadClass', 'threadStandard']) field(name).closest('.acui-field').hidden = record.type !== 'Diş';
     field('fitClass').closest('.acui-field').hidden = record.type === 'Diş';
     $("#acuiValueResult").hidden = record.evaluationMethod === "OK_NOT_OK";
     $("#acuiBinaryResult").hidden = record.evaluationMethod !== "OK_NOT_OK";
@@ -980,8 +976,14 @@
         if(name==='number'&&bridge.changeBalloonNumber){input.remove();await bridge.changeBalloonNumber(id,value);return;}
         if (name === "number" && (!value || state().annotations.some(item => item.id !== id && text(item.number) === value))) { bridge.toast?.("Balon numarası boş veya başka bir kayıtta kullanılıyor."); input.remove(); render(); return; }
         if (name === "result" && record.evaluationMethod !== "OK_NOT_OK" && value && !finiteNumber(value)) { bridge.toast?.("Geçerli bir sayısal ölçüm girin."); input.remove(); render(); return; }
+        const previousType=record.type;
         bridge.checkpoint();
         record[name] = name === "result" && record.evaluationMethod !== "OK_NOT_OK" ? normalizedNumber(value) : value;
+        if(name==='type'){
+          Object.assign(record,engine().transitionType({...record,type:previousType},value));
+          record.unit=window.ASMachCharacteristicEditing.defaultUnitForType(value,state().generalTolerance?.unit);
+          Object.assign(record,window.ASMachCharacteristicEditing.refreshGeneral(record,state().generalTolerance,bridge.parseRequirement));
+        }
         if (name === "inspectionMethod") applyMethod(record, value);
         if(name==='inspectionFrequency')record.frequencyInterval='';
         if(name==='type'&&value==='Not'){
@@ -991,7 +993,7 @@
         }
         record.manualFields = [...new Set([...(record.manualFields || []), name])];
         if (name === 'requirement') record.requirementMode = 'manual';
-        if (engine().syncRequirement) Object.assign(record, engine().syncRequirement(record));
+        if (engine().syncRequirement) Object.assign(record, engine().syncRequirement(record,[...parsedFields,'specialDesignator'].includes(name)));
         // A quick requirement edit preserves existing nominal/tolerance overrides.
         recordChange(`Hızlı düzenleme: ${name}`, record);
         input.remove();
@@ -1019,6 +1021,7 @@
     $("#acuiGeneralStandard").value = standard;
     $("#acuiGeneralLower").value = general.lower ?? "";
     $("#acuiGeneralUpper").value = general.upper ?? "";
+    window.ASMachCharacteristicEditing.mountPrecisionRules($('#acuiGeneralUpper').closest('.acui-grid'),general);
     updateGeneralFields();
     const records = state().annotations;
     const pending = records.filter(record => ["needs_review", "pending_review", "KONTROL", "TASLAK"].includes(record.status)).length;
@@ -1029,9 +1032,10 @@
   }
 
   function updateGeneralFields() {
-    const custom = $("#acuiGeneralStandard").value === "CUSTOM";
+    const custom = ($("#acuiGeneralStandard").value === "CUSTOM" || /^ASME Y14\.5-/.test($("#acuiGeneralStandard").value));
     $("#acuiGeneralLower").disabled = !custom;
     $("#acuiGeneralUpper").disabled = !custom;
+    const rules=$('#acuiMetadata').querySelector('[data-precision-rules]');if(rules)rules.style.display=/^ASME/.test($('#acuiGeneralStandard').value)?'flex':'none';
   }
 
   function saveMetadata(event) {
@@ -1039,12 +1043,15 @@
     const standard = $("#acuiGeneralStandard").value;
     const lower = normalizedNumber($("#acuiGeneralLower").value);
     const upper = normalizedNumber($("#acuiGeneralUpper").value);
-    if (standard === "CUSTOM" && (!finiteNumber(lower) || !finiteNumber(upper) || Number(lower) > Number(upper))) { bridge.toast?.("Özel tolerans için geçerli alt ve üst sapma girin."); return; }
+    const precision=window.ASMachCharacteristicEditing.readPrecisionRules($('#acuiMetadata'));
+    if(/^ASME/.test(standard)&&precision.error){bridge.toast?.(precision.error);return;}
+    if (!( /^ASME/.test(standard) && Object.keys(precision.rules||{}).length && !lower && !upper) && (standard === "CUSTOM" || /^ASME Y14\.5-/.test(standard)) && (!finiteNumber(lower) || !finiteNumber(upper) || Number(lower) > Number(upper))) { bridge.toast?.("Özel tolerans için geçerli alt ve üst sapma girin."); return; }
     bridge.checkpoint();
     const metadata = clone(state().metadata || {});
     $$("[data-metadata-field]").forEach(element => { metadata[element.dataset.metadataField] = element.value.trim(); });
+    metadata.projectDefaults = { ...(metadata.projectDefaults || {}), toleranceStandard: standard };
     state().metadata = metadata;
-    state().generalTolerance = { ...(state().generalTolerance || {}), standard, lower: standard === "CUSTOM" ? lower : "", upper: standard === "CUSTOM" ? upper : "", unit: state().generalTolerance?.unit || "mm" };
+    state().generalTolerance = { ...(state().generalTolerance || {}), standard, precisionRules:/^ASME/.test(standard)?precision.rules:{}, lower: (standard === "CUSTOM" || /^ASME Y14\.5-/.test(standard)) ? lower : "", upper: (standard === "CUSTOM" || /^ASME Y14\.5-/.test(standard)) ? upper : "", unit: state().generalTolerance?.unit || "mm" };
     recordChange("Çizim bilgileri ve genel tolerans güncellendi");
     closeDialog($("#acuiMetadata"));
     bridge.renderAll();

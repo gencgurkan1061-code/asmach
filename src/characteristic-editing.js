@@ -2,35 +2,60 @@
  'use strict';
  const clone=x=>JSON.parse(JSON.stringify(x)),num=x=>x!==''&&x!=null&&Number.isFinite(Number(String(x).replace(',','.'))),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const toleranceFields=['lowerTolerance','upperTolerance','lowerLimit','upperLimit','toleranceStandard'];
- const standards=[['','Genel tolerans seçin'],...['f','m','c','v'].flatMap(c=>['H','K','L'].map(g=>['ISO 2768-'+c+g,'ISO 2768-'+c+g+' · '+({f:'ince',m:'orta',c:'kaba',v:'çok kaba'}[c])+' (legacy)'])),['CUSTOM','Çizim bilgilerindeki özel tolerans']];
+ const standards=[['','Genel tolerans seçin'],...['f','m','c','v'].flatMap(c=>['H','K','L'].map(g=>['ISO 2768-'+c+g,'ISO 2768-'+c+g+' · '+({f:'ince',m:'orta',c:'kaba',v:'çok kaba'}[c])+' (legacy)'])),['ASME Y14.5-2018','ASME Y14.5-2018 · çizim alt/üst sapmaları'],['ASME Y14.5-2009','ASME Y14.5-2009 · çizim alt/üst sapmaları'],['CUSTOM','Çizim bilgilerindeki özel tolerans']];
  const options=(values)=>values.map(v=>`<option value="${esc(v.value??v[0])}">${esc(v.label??v[1])}</option>`).join('');
  function planSummary(patch,methods){const names={inspectionMethod:'Yöntem',inspectionFrequency:'Sıklık',frequencyInterval:'Aralık (N)',frequencyNote:'Sıklık açıklaması',sampleMode:'Numune planı',sampleCount:'Numune adedi',sampleLevel:'Muayene seviyesi'};return Object.entries(patch).map(([k,v])=>{const label=k==='sampleMode'?({none:'Adet belirtilmedi',manual:'Manuel adet',table:'Tabloya göre',all:'%100 kontrol'})[v]:k==='inspectionFrequency'?root.ASMachInspectionPlan.FREQUENCIES.find(f=>f.value===v)?.label:k==='inspectionMethod'?methods.find(m=>m.value===v)?.label:v;return `${names[k]||k}: ${label||'Belirtilmedi'}`;}).join(' · ');}
  function general(record,standard,parse,referenceLength=0,replace=false){
    if(!standard)return{reason:'Genel tolerans seçilmedi.'};
    if(record.drawingStandard==='ASME'&&standard.startsWith('ISO'))return{reason:'ASME seçili: ISO genel toleransı uygulanmadı. Çizimin özel tolerans değerlerini kullanın.'};
    if(!['Uzunluk','Ölçü','Çap','Yarıçap','Pah','Açı'].includes(record.type)||record.fitClass||record.threadClass)return{reason:'Bu tür için genel tolerans uygulanmaz.'};
+   if(record.toleranceAmbiguous||record.callout?.basic||record.callout?.reference||record.callout?.depth||record.callout?.secondaryDiameter||record.callout?.countersinkAngle)return{reason:'Bu gösterime otomatik genel tolerans uygulanmaz.'};
    if(!num(record.nominalValue))return{reason:'Geçerli nominal ölçü gerekli.'};
-   if(record.type==='Açı' ? record.unit!=='°' : record.unit!=='mm')return{reason:'Ölçü birimi genel toleransla uyumlu değil.'};
+   const drawingTolerance=standard==='CUSTOM'||/^ASME Y14\.5-/.test(standard);
+   if(record.type==='Açı'&&standard==='CUSTOM')return{reason:'Bu çizim toleransı doğrusal ölçüler içindir; açı toleransını ayrıca belirtin.'};
+   if(record.type==='Açı' ? record.unit!=='°' : drawingTolerance?!['mm','in'].includes(record.unit):record.unit!=='mm')return{reason:'Ölçü birimi genel toleransla uyumlu değil.'};
    if(!replace&&(record.toleranceExplicit||toleranceFields.slice(0,4).some(k=>String(record[k]??'').trim()!=='')))return{reason:'Mevcut tolerans / limit korundu.'};
-   if(record.type==='Açı'&&!(Number(referenceLength)>0))return{reason:'Açı için kısa kenar uzunluğunu girin.'};
-   const raw=String(record.nominalValue).replace(',','.')+(record.type==='Açı'?'°':''),p=parse(raw,standard,record.type,Number(referenceLength));
+   if(record.type==='Açı'&&!drawingTolerance&&!(Number(referenceLength)>0))return{reason:'Açı için kısa kenar uzunluğunu girin.'};
+   let raw=String(record.nominalValue).replace(',','.')+(record.type==='Açı'?'°':record.unit==='in'?' in':'');
+   if(/^ASME/.test(standard)){
+    const source=String(record.ocrText||record.measurementEvidence?.rawText||'').trim(),match=source.match(/^(?:Ø|R)?\s*(\d+(?:[.,]\d+)?|\.\d+)\s*(?:mm|in|°)?$/i);
+    if(!match||Number(match[1].replace(',','.'))!==Number(record.nominalValue))return{reason:'ASME tablo seçimi için özgün ölçünün ondalık basamakları gerekli. Ölçü alanını yeniden okuyun veya sapmaları elle girin.'};
+    raw=source+(!/(?:mm|in|°)$/i.test(source)?record.type==='Açı'?'°':' '+record.unit:'');
+   }
+   const p=parse(raw,standard,record.type,Number(referenceLength));
    if(!p||!num(p.lowerTolerance)||!num(p.upperTolerance))return{reason:'Seçilen genel toleransta bu ölçü için değer bulunamadı. Özel tolerans ayarlarını veya ölçü aralığını kontrol edin.'};
    const patch=Object.fromEntries(toleranceFields.map(k=>[k,p[k]??'']));patch.toleranceExplicit=false;patch.referenceLength=record.type==='Açı'?Number(referenceLength):record.referenceLength;
    if(!num(p.lowerLimit)||!num(p.upperLimit)||Number(p.lowerLimit)>Number(p.upperLimit))return{reason:'Hesaplanan limitler geçerli değil; genel tolerans ayarlarını kontrol edin.'};
    return{patch};
  }
+ // Derived tolerances are a calculation, not a user override. Recompute from
+ // the CURRENT type/nominal; never feed old deviations back into the parser.
+ function refreshGeneral(record,profile={},parse){
+   const numeric=toleranceFields.slice(0,4),filled=k=>String(record[k]??'').trim()!=='';
+   const manual=(record.manualFields||[]).some(k=>numeric.includes(k)&&filled(k))||/^Manuel/i.test(record.toleranceStandard||'');
+   if(record.toleranceExplicit||record.limitDimension)return record;
+   if(manual)return{...record,toleranceExplicit:true};
+   const derived=/^(?:ISO\s*2768-|ASME\s+Y14\.5-|Kullanıcı genel toleransı)/i.test(record.toleranceStandard||'');
+   if(!derived&&(record.toleranceStandard||numeric.some(filled)))return record; // Unknown legacy values and thread/surface standards are not safe to replace.
+   let next={...record};
+   if(derived){for(const key of toleranceFields)next[key]='';next.measurementEvidence=null;}
+   if(typeof parse!=='function')return next;
+   const result=general(next,profile.standard||'',parse,next.referenceLength);
+   if(result.patch)next={...next,...result.patch};
+   return next;
+ }
  function prepare(records,changes,parse){
    const updates=[],skips=[],errors=[];
    if(!Object.keys(changes.fields||{}).length&&!Object.keys(changes.roles||{}).length&&!changes.standard)return{updates,skips,errors};
-   for(const source of records){const errorsBefore=errors.length;let r=clone(source);Object.assign(r,changes.fields||{});
+   for(const source of records){const errorsBefore=errors.length;let r=clone(source);Object.assign(r,changes.fields||{});let measurementChanged=Object.keys(changes.fields||{}).some(key=>['type','unit','specialDesignator'].includes(key)&&String(source[key]??'')!==String(r[key]??''));
      if(changes.fields?.type&&changes.fields.type!==source.type&&[source.type,r.type].some(t=>['GD&T','Diş','Geçme','Datum'].includes(t))){errors.push(`#${r.number}: GD&T, datum, diş ve geçme tür dönüşümünü sağ panelde doğrulayın. Bu kayıt değiştirilmeden bırakılacak.`);continue;}
-     if(changes.fields?.type&&changes.fields.type!==source.type){const profile=root.ASMachRequirements.fieldProfile(r.type);if(!profile.numeric){for(const key of [...toleranceFields,'nominalValue','unit'])r[key]='';r.toleranceExplicit=false;r.evaluationMethod='OK_NOT_OK';}r.unit=changes.fields.unit!==undefined?compatibleUnit(r.type,changes.fields.unit):defaultUnitForType(r.type);}
+     if(changes.fields?.type&&changes.fields.type!==source.type){const targetType=r.type;r=root.ASMachRequirements.transitionType({...r,type:source.type},targetType);r.unit=changes.fields.unit!==undefined?compatibleUnit(r.type,changes.fields.unit):defaultUnitForType(r.type);r=refreshGeneral(r,root.ASMachApp?.state.generalTolerance,parse);}
      for(const [role,patch] of Object.entries(changes.roles||{})){r.rolePlans||={};const old=r.rolePlans[role]||{...root.ASMachRolePlans.blank(),inspectionMethod:source.inspectionMethod||'',inspectionFrequency:source.inspectionFrequency||'',frequencyInterval:source.frequencyInterval||'',frequencyNote:source.frequencyNote||''};r.rolePlans[role]={...old,...patch,enabled:true};if(patch.inspectionFrequency==='EACH_PART')r.rolePlans[role].sampleMode='all';if('frequencyInterval'in patch&&!['EVERY_N_PIECES','EVERY_N_HOURS'].includes(r.rolePlans[role].inspectionFrequency))errors.push(`#${r.number}: ${role==='operator'?'Operatör':'Kalite'} için aralık değiştirmek üzere “Her N parçada / saatte” sıklığını seçin.`);if(!['EVERY_N_PIECES','EVERY_N_HOURS'].includes(r.rolePlans[role].inspectionFrequency))r.rolePlans[role].frequencyInterval='';const e=root.ASMachInspectionPlan.validate(r.rolePlans[role]);if(e)errors.push(`#${r.number}: ${e}`);if('sampleMode'in patch||'sampleCount'in patch||'sampleLevel'in patch){const error=root.ASMachRolePlans.samplingError(r.rolePlans[role],role);if(error)errors.push(`#${r.number}: ${role==='operator'?'Operatör':'Kalite'}: ${error}`);}}
      if(Object.keys(changes.roles||{}).length){const error=root.ASMachRolePlans.validate(r);if(error)errors.push(`#${r.number}: ${error}`);}
-     if(changes.standard){const result=general(r,changes.standard,parse,changes.referenceLength,changes.replace);if(result.patch){Object.assign(r,result.patch);r.manualFields=(r.manualFields||[]).filter(k=>!toleranceFields.includes(k));}else skips.push(`#${r.number}: ${result.reason}`);}
+     if(changes.standard){const result=general(r,changes.standard,parse,changes.referenceLength,changes.replace);if(result.patch){Object.assign(r,result.patch);r.manualFields=(r.manualFields||[]).filter(k=>!toleranceFields.includes(k));measurementChanged=true;}else skips.push(`#${r.number}: ${result.reason}`);}
      if(errors.length>errorsBefore||JSON.stringify(r)===JSON.stringify(source))continue;
      r.manualFields=[...new Set([...(r.manualFields||[]),...Object.keys(changes.fields||{})])];
-     r=root.ASMachRequirements.syncRequirement(r);
+     r=root.ASMachRequirements.syncRequirement(r,measurementChanged);
      if(JSON.stringify(r)!==JSON.stringify(source))updates.push({source,before:JSON.stringify(source),after:r});
    }return{updates,skips,errors};
  }
@@ -83,10 +108,18 @@
  function compatibleUnit(type,current,preferred){const units=unitsForType(type);return units.includes(current)?current:units.includes(preferred)?preferred:units[0];}
  function defaultUnitForType(type,preferred=root.ASMachApp?.state.generalTolerance?.unit){type=root.ASMachRequirements.normalizeType(type);return type==='Yüzey'?'µm':type==='Açı'?'°':['Uzunluk','Çap','Yarıçap','Pah','Tolerans','GD&T','Diş','Geçme'].includes(type)?preferred==='in'?'in':'mm':'';}
  const pendingCorrections=new WeakSet();
+ function preserveSurfaceBound(previous,next){
+  if(previous.type!=='Yüzey'||next.type!=='Yüzey'||String(previous.nominalValue)===String(next.nominalValue))return next;
+  const filled=value=>value!==null&&value!==undefined&&String(value).trim()!=='';
+  if(!filled(next.nominalValue)||!Number.isFinite(Number(next.nominalValue))||['lowerTolerance','upperTolerance'].some(key=>filled(previous[key])||filled(next[key])))return next;
+  if(filled(previous.upperLimit)&&Number(previous.upperLimit)===Number(previous.nominalValue)&&(!filled(previous.lowerLimit)||Number(previous.lowerLimit)===0))return{...next,upperLimit:next.nominalValue,lowerLimit:previous.lowerLimit||''};
+  if(filled(previous.lowerLimit)&&Number(previous.lowerLimit)===Number(previous.nominalValue)&&!filled(previous.upperLimit))return{...next,lowerLimit:next.nominalValue,upperLimit:''};
+  return next;
+ }
  async function confirmCorrection(app,record,patch){
   if(pendingCorrections.has(record))return false;
   const before=JSON.stringify(record),documentKey=app.state.fileData;
-  const revised={...record,...patch};
+  let revised=preserveSurfaceBound(record,{...record,...patch});
   if(record.limitDimension&&revised.type===record.type){
    const nominalChanged=String(revised.nominalValue)!==String(record.nominalValue),deviationChanged=['lowerTolerance','upperTolerance'].some(k=>String(revised[k])!==String(record[k]));
    if(nominalChanged&&!deviationChanged){
@@ -95,12 +128,11 @@
    }else if(deviationChanged){revised.limitDimension=false;revised.nominalSource='';}
   }
   if(revised.type!==record.type){
-   if(!['Uzunluk','Çap','Yarıçap','Pah','Tolerans'].includes(revised.type)||!['Uzunluk','Çap','Yarıçap','Pah','Tolerans'].includes(record.type)){revised.limitDimension=false;revised.nominalSource='';}
+   const targetType=revised.type;
+   revised=root.ASMachRequirements.transitionType({...revised,type:record.type},targetType);
    revised.unit=defaultUnitForType(revised.type,app.state.generalTolerance?.unit);
-   if(revised.type!=='Geçme')revised.fitClass='';
-   if(revised.type!=='Diş'){revised.threadClass='';revised.threadPitch='';}
-   if(revised.type!=='GD&T'){revised.gdtSubtype='';revised.gdtFrame=null;}
   }
+  revised=refreshGeneral(revised,app.state.generalTolerance,app.parseRequirement);
   const next=root.ASMachRequirements.syncRequirement(revised,true);
   if(next.type==='GD&T')Object.assign(next,root.ASMachRequirements.withGdtSubtype(next));
   const labels={type:'Tür',unit:'Birim',nominalValue:'Nominal',lowerTolerance:'Alt tolerans',upperTolerance:'Üst tolerans',lowerLimit:'Alt limit',upperLimit:'Üst limit',requirement:'Gereklilik'};
@@ -117,5 +149,17 @@
    app.checkpoint();Object.assign(record,next);record.resultStatus=root.ASMachRequirements.evaluate(record).status||'pending';app.recordChange('Ölçü ve gereklilik onayla güncellendi',record);app.renderAll();return true;
   }finally{pendingCorrections.delete(record);}
  }
- root.ASMachCharacteristicEditing={general,prepare,open,standards,options,confirmCorrection,unitsForType,defaultUnitForType,compatibleUnit};
+ function mountPrecisionRules(container,profile={}) {
+  container.querySelector('[data-precision-rules]')?.remove();
+  const box=document.createElement('fieldset');box.dataset.precisionRules='';box.style.cssText='grid-column:1/-1;border:1px solid #c9dce5;padding:8px;display:flex;flex-wrap:wrap;gap:8px';
+  const legend=document.createElement('legend');legend.textContent='ASME · çizimdeki ondalık basamak toleransları (isteğe bağlı)';box.append(legend);
+  for(const [key,title]of [['0','X ±'],['1','X.X ±'],['2','X.XX ±'],['3','X.XXX ±'],['4','X.XXXX ±'],['angle','Açı ± (°)']]){
+   const label=document.createElement('label');label.textContent=title;label.style.cssText='display:flex;flex-direction:column;width:110px';const input=document.createElement('input');input.dataset.precisionKey=key;input.inputMode='decimal';input.value=profile.precisionRules?.[key]??'';input.placeholder='Çizimdeki değer';label.append(input);box.append(label);
+  }
+  const note=document.createElement('small');note.textContent='Bunlar ASME varsayılanları değildir. Yalnız çizimde belirtilen değerleri girin. Boş satıra tablo toleransı uygulanmaz; varsa genel alt/üst sapmalar kullanılır.';note.style.flexBasis='100%';box.append(note);container.append(box);return box;
+ }
+ function readPrecisionRules(container){
+  const rules={};for(const input of container.querySelectorAll('[data-precision-key]')){const value=input.value.trim().replace(',','.');if(!value)continue;if(!Number.isFinite(Number(value))||Number(value)<0)return{error:'Tablo toleransları sıfır veya pozitif sayı olmalı.'};rules[input.dataset.precisionKey]=value;}return{rules};
+ }
+ root.ASMachCharacteristicEditing={mountPrecisionRules,readPrecisionRules,general,refreshGeneral,prepare,open,standards,options,confirmCorrection,unitsForType,defaultUnitForType,compatibleUnit,preserveSurfaceBound};
 })(window);

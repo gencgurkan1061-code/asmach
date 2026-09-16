@@ -12,7 +12,9 @@ tmp/
 *.pfx
 *.p12
 .license-admin/
+.release-admin/
 *.asmach-license
 license-manager/runtime/
 ASMach Lisans Yönetimi.exe
 .wrangler/
+__pycache__/

@@ -3,7 +3,7 @@
   'use strict';
   const norm=a=>((a+540)%360)-180;
   function detect(source,seed,options={}){
-    const frame=root.ASMachGdtVision?.findFrame(source,seed,options);
+    const frame=!options.lockAngle&&root.ASMachGdtVision?.findFrame(source,seed,options);
     if(frame)return frame;
     const scale=Math.min(1,1000/Math.max(source.width,source.height)),work=document.createElement('canvas');
     work.width=Math.max(1,Math.round(source.width*scale));work.height=Math.max(1,Math.round(source.height*scale));
@@ -43,12 +43,35 @@
       const d=Math.hypot(xx-yy,2*xy);elongation=(xx+yy+d)/Math.max(1,xx+yy-d);
       if(elongation>7)pixelAngle=.5*Math.atan2(2*xy,xx-yy)*180/Math.PI;
     }
+    // Ink mass is not a baseline: a narrow 1 can weigh less than a superscript
+    // 0. Use the geometric centres of full-height glyphs instead. Iterate in
+    // text coordinates so this also works on oblique and vertical dimensions.
+    let alignedGlyphs=0;
+    if(!options.lockAngle&&pixelAngle!==null){
+      for(let iteration=0;iteration<3;iteration++){
+        const a=pixelAngle*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+        const projected=parts.filter(p=>p.n>=Math.max(8,largest*.12)).map(p=>{
+          let l=Infinity,r=-Infinity,t=Infinity,bottom=-Infinity;
+          for(const i of p.pixels){const x=i%w+.5,y=Math.floor(i/w)+.5,u=x*c+y*s,v=-x*s+y*c;l=Math.min(l,u);r=Math.max(r,u);t=Math.min(t,v);bottom=Math.max(bottom,v);}
+          return{u:(l+r)/2,v:(t+bottom)/2,h:bottom-t+1,w:r-l+1};
+        });
+        const height=Math.max(0,...projected.map(p=>p.h));
+        const line=projected.filter(p=>p.h>=height*.78&&p.w<height*1.8);
+        if(line.length<2)break;
+        const u=line.reduce((n,p)=>n+p.u,0)/line.length,v=line.reduce((n,p)=>n+p.v,0)/line.length;
+        let xx=0,yy=0,xy=0;for(const p of line){xx+=(p.u-u)**2;yy+=(p.v-v)**2;xy+=(p.u-u)*(p.v-v);}
+        if(xx<height*height*.15||yy>xx*.12)break;
+        const correction=Math.atan2(xy,xx)*180/Math.PI;
+        if(Math.abs(correction)>20)break;
+        pixelAngle+=correction;alignedGlyphs=line.length;
+      }
+    }
     let correctedHint=false;
     if(pixelAngle!==null){
       // PDF layers and OCR rotation report coordinate axes, not always the actual
       // baseline. Preserve their reading polarity but verify the axis in pixels.
       const difference=angle===null?0:Math.abs(((pixelAngle-angle+270)%180)-90);
-      if(angle===null||(difference>12&&elongation>12)){
+      if(!options.lockAngle&&(angle===null||(difference>12&&elongation>12)||(alignedGlyphs>=3&&difference>2.5))){
         if(angle!==null){pixelAngle+=Math.round((angle-pixelAngle)/180)*180;correctedHint=true;}
         angle=pixelAngle;confidence=true;
       }

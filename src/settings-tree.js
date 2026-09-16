@@ -12,6 +12,14 @@
   settings.querySelector('.ds-body').append(license);
   const licenseStatus=()=>{const available=!!root.ASMachDesktop?.license?.open;license.querySelector('button').disabled=!available;license.querySelector('[role=status]').textContent=available?'Etkinleştirme ve doğrulama işlemleri hemen uygulanır.':'Lisans işlemleri yalnızca kurulu masaüstü uygulamasında kullanılabilir.';};
   license.querySelector('button').onclick=()=>root.ASMachDesktop?.license?.open();root.addEventListener('asmach-native-ready',licenseStatus);licenseStatus();
+  const updates=doc.createElement('fieldset');updates.id='ds-panel-updates';updates.hidden=true;
+  updates.innerHTML='<legend>Güncelleştirmeleri denetle</legend><h3>ASMach Inspection güncelleştirmeleri</h3><p data-update-version>Yüklü sürüm bilgisi hazırlanıyor…</p><p data-update-status role="status">Yeni sürümler imzalı bildirim ve paket doğrulamasıyla denetlenir.</p><div class="settings-update-actions"><button type="button" class="btn primary" data-update-check>Güncelleştirmeleri denetle</button><button type="button" class="btn primary" data-update-install hidden>İndir ve güncelle</button></div><p data-update-notes></p>';
+  settings.querySelector('.ds-body').append(updates);
+  let availableUpdate=null;
+  const updateStatus=()=>{const desktop=root.ASMachDesktop,updater=desktop?.updater;updates.querySelector('[data-update-version]').textContent=desktop?.info?'Yüklü sürüm: '+desktop.info.version:'Bu özellik kurulu Windows uygulamasında kullanılabilir.';const check=updates.querySelector('[data-update-check]');check.disabled=!updater?.configured;if(updater?.current()){availableUpdate=updater.current();updates.querySelector('[data-update-install]').hidden=false;updates.querySelector('[data-update-install]').textContent=availableUpdate.version+' sürümünü indir ve kur';updates.querySelector('[data-update-notes]').textContent=availableUpdate.notes||'';}else if(!updater?.configured){updates.querySelector('[data-update-status]').textContent='Güncelleştirme hizmeti bu pakette yapılandırılmamış.';}};
+  updates.querySelector('[data-update-check]').onclick=async e=>{e.currentTarget.disabled=true;updates.querySelector('[data-update-status]').textContent='Güncelleştirmeler denetleniyor…';try{availableUpdate=await root.ASMachDesktop.updater.check();const install=updates.querySelector('[data-update-install]');install.hidden=!availableUpdate;if(availableUpdate){install.textContent=availableUpdate.version+' sürümünü indir ve kur';updates.querySelector('[data-update-notes]').textContent=availableUpdate.notes||'';}else updates.querySelector('[data-update-notes]').textContent='';}finally{e.currentTarget.disabled=!root.ASMachDesktop?.updater?.configured;}};
+  updates.querySelector('[data-update-install]').onclick=()=>root.ASMachDesktop?.updater?.install(availableUpdate);
+  root.addEventListener('asmach-updater-ready',updateStatus);root.addEventListener('asmach-updater-status',e=>{updates.querySelector('[data-update-status]').textContent=e.detail.message;if(e.detail.update){availableUpdate=e.detail.update;updateStatus();}});updateStatus();
   function makeTree(host,body){
    host.classList.add('settings-tree-shell');
    const layout=doc.createElement('div');layout.className='st-layout';body.before(layout);
@@ -29,7 +37,7 @@
   const click=s=>doc.querySelector(s)?.click();
   function settingsArea(tab){
    if(!settings.open)click('#appSettingsButton');else root.ASMachWorkspaceTabs?.activate('settings');
-   license.hidden=true;click('#desktopSettings>.ds-tabs [data-settings-tab="'+tab+'"]');
+   license.hidden=true;updates.hidden=true;click('#desktopSettings>.ds-tabs [data-settings-tab="'+tab+'"]');
    settings.querySelectorAll('footer button').forEach(b=>b.hidden=tab!=='appearance');
   }
   function styleArea(classes){
@@ -41,6 +49,7 @@
   function rows(){
    const output=indices=>{settingsArea('output');settings.querySelectorAll('.os-grid>fieldset').forEach((n,i)=>n.hidden=!indices.includes(i));};
    const licensing=()=>{settingsArea('appearance');appearance.hidden=true;license.hidden=false;licenseStatus();};
+   const updating=()=>{settingsArea('appearance');appearance.hidden=true;updates.hidden=false;updateStatus();};
    return [
     ['Genel',[
      ['general','Başlangıç ve kayıt',()=>custom('Başlangıç ve kayıt','Uygulama boş proje alanıyla başlar. Kaydedilen projeler ve son açılanlar burada listelenir. Çalışma sırasında yerel kurtarma kopyası otomatik tutulur; bu kopya proje dosyasını kaydetmenin yerini tutmaz.')],
@@ -59,6 +68,10 @@
     ['Rapor ve çıktı',[
      ['pdf','PDF',()=>output([0,2,3])],['excel','Excel ve şablonlar',()=>output([1])],
      ['brand','Firma bilgileri ve logo',()=>{custom('Firma bilgileri ve logo','Yeni oluşturulan yerleşik raporlarda kullanılır. Özel Excel şablonlarındaki sabit yazı ve logoları şablon düzenleyicisinden değiştirin.');root.ASMachBrandSettings.mount(extra);}]
+    ]],
+    ['Uygulama',[
+     ['updates','Güncelleştirmeleri denetle',updating],
+     ['license','Lisans ve etkinleştirme',licensing]
     ]]
    ];
   }
@@ -81,6 +94,7 @@
   parts.forEach(n=>n.hidden=false);render();
   const css=doc.createElement('style');css.textContent=`
   .st-options{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:0 0 12px;margin-bottom:12px;border-bottom:1px solid #d4e2ec;background:white}.st-options .btn[aria-pressed=true]{background:#e0f2f5;color:#007c8c;border-color:#89c8d2}.st-options select{max-width:250px;border:1px solid #c8dce8;border-radius:4px;padding:6px;color:#234c62;background:white}
+  #ds-panel-updates{max-width:760px}#ds-panel-updates [role=status]{padding:12px;border:1px solid #cfe0e9;border-radius:7px;background:#f5fafc;white-space:pre-line}.settings-update-actions{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
   html body #desktopSettings .ds-appearance-sections{grid-template-columns:1fr!important}
   html body #balloonSettingsModal.st-legend-only .sw-content{display:none!important}html body #balloonSettingsModal:not(.st-legend-only) .appearance-legend{display:none!important}
   html body :is(#desktopSettings,#balloonSettingsModal) .st-layout{display:grid!important;grid-template-columns:245px minmax(0,1fr);flex:1;min-height:0;overflow:hidden;background:#f7fafc}

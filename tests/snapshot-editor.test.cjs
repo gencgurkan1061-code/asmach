@@ -20,6 +20,18 @@ test('Rotation retains full source resolution and fits arbitrary angles without 
   }
 });
 
+test('OCR rotation slider geometry uses page aspect ratio, preserves dimensions and round-trips in projects',()=>{
+ const {api}=fixture(),base={x:.2,y:.3,w:.25,h:.08};
+ for(const [W,H]of [[1600,600],[600,1600]])for(const angle of [-180,-90,-8.3,0,25.5,90,180]){
+  const box=api.rotateBox(base,W,H,angle),r=api.boxRect(JSON.parse(JSON.stringify(box)),W,H);
+  assert.equal(box.angleLocked,true);assert.equal(box.rotation,angle);assert.ok(Math.abs(r.w-base.w*W)<1e-7);assert.ok(Math.abs(r.h-base.h*H)<1e-7);
+  assert.ok(Math.abs(Math.cos(r.angle*Math.PI/180)-Math.cos(angle*Math.PI/180))<1e-7);
+  for(const p of box.points)assert.ok(p.x>=0&&p.x<=1&&p.y>=0&&p.y<=1);
+  const flat=api.rotateBox(box,W,H,0),rect=api.boxRect(flat,W,H);assert.ok(Math.abs(rect.w-base.w*W)<1e-7);assert.equal(rect.angle,0);
+ }
+ for(const angle of [-180,-90,-45,0,45,90,180]){const box=api.rotateBox({x:0,y:.001,w:.2,h:.15},1600,600,angle);for(const p of box.points)assert.ok(p.x>=0&&p.y>=0&&p.x<=1&&p.y<=1);}
+});
+
 test('Balloon is preview-only; its virtual margin does not resize or annotate the report source',async()=>{
   const {api,canvas,drawings}=fixture(),controls={...viewControls(),canvas:canvas(),'[data-result]':canvas(),'[data-auto]':{},'[data-info]':{},'[data-crop]':{},'[data-reset]':{},'[data-new]':{}};
   const container={querySelector:k=>controls[k],querySelectorAll:()=>[]};let saved;

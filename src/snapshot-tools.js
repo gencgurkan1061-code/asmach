@@ -3,6 +3,19 @@
   'use strict';
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   function corners(r){const a=r.angle*Math.PI/180,c=Math.cos(a),s=Math.sin(a);return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y])=>({x:r.cx+x*r.w/2*c-y*r.h/2*s,y:r.cy+x*r.w/2*s+y*r.h/2*c}));}
+  // All rotation math is in PAGE PIXELS, not normalized coordinates: using
+  // normalized x/y directly would skew boxes on non-square drawing sheets.
+  function boxRect(box,width,height){
+    const p=box.points?.length===4?box.points.map(v=>({x:v.x*width,y:v.y*height})):null;
+    if(p)return{cx:p.reduce((s,v)=>s+v.x,0)/4,cy:p.reduce((s,v)=>s+v.y,0)/4,w:Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y),h:Math.hypot(p[3].x-p[0].x,p[3].y-p[0].y),angle:Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x)*180/Math.PI};
+    return{cx:(box.x+box.w/2)*width,cy:(box.y+box.h/2)*height,w:box.w*width,h:box.h*height,angle:0};
+  }
+  function rotateBox(box,width,height,angle){
+    if(!box||!Number.isFinite(angle)||!(width>0&&height>0))throw Error('Geçerli kutu ve açı gerekli.');
+    const rect=constrain({...boxRect(box,width,height),angle:clamp(angle,-180,180)},width,height);
+    const points=corners(rect).map(p=>({x:clamp(p.x/width,0,1),y:clamp(p.y/height,0,1)})),x=Math.min(...points.map(p=>p.x)),y=Math.min(...points.map(p=>p.y));
+    return{x,y,w:Math.max(...points.map(p=>p.x))-x,h:Math.max(...points.map(p=>p.y))-y,points,rotation:rect.angle,angleLocked:true};
+  }
   function constrain(r,width,height){
     const a=r.angle*Math.PI/180,c=Math.abs(Math.cos(a)),s=Math.abs(Math.sin(a));
     const w=Math.max(2,r.w),h=Math.max(2,r.h),scale=Math.min(1,width/(w*c+h*s),height/(w*s+h*c));
@@ -95,5 +108,5 @@
     const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(source&&!drag)draw();}):null;observer?.observe(container.querySelector('.snapshot-stage'));
     return{commit,refresh:draw,fit,dispose(){disposed=true;observer?.disconnect();},getSelection(){return r?{...r}:null;}};
   }
-  root.ASMachSnapshots={cropCanvas,rotateCanvas,mount,_test:{corners,constrain,adjust,extract}};
+  root.ASMachSnapshots={cropCanvas,rotateCanvas,boxRect,rotateBox,mount,_test:{corners,constrain,adjust,extract}};
 })(window);

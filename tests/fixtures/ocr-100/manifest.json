@@ -1,0 +1,2006 @@
+{
+  "schema": 1,
+  "purpose": "locked-holdout",
+  "training": false,
+  "caseCount": 100,
+  "labelSource": "Authored drawing transcriptions and expected fields; not OCR-generated.",
+  "synthetic": true,
+  "families": {
+    "Uzunluk": 14,
+    "Çap": 10,
+    "Yarıçap": 6,
+    "Açı": 6,
+    "Diş": 18,
+    "Geçme": 6,
+    "Pah": 6,
+    "Yüzey": 8,
+    "GD&T": 12,
+    "Datum": 2,
+    "Tolerans": 2,
+    "Not": 2,
+    "Malzeme": 2,
+    "Proses": 2,
+    "Görsel": 2,
+    "Diğer": 2
+  },
+  "fontFamilies": [
+    "consola.ttf",
+    "verdana.ttf",
+    "segoeui.ttf",
+    "tahoma.ttf"
+  ],
+  "cases": [
+    {
+      "id": "m001",
+      "family": "Uzunluk",
+      "text": "18.375",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 18.375
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m001.png",
+      "width": 158,
+      "height": 92,
+      "sha256": "f03ebf9ca142b893befc5d25f6438a51840b2de02a9989d9cd6233cd35e80db4"
+    },
+    {
+      "id": "m002",
+      "family": "Uzunluk",
+      "text": "72,65",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 72.65
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m002.png",
+      "width": 143,
+      "height": 92,
+      "sha256": "1e8a9b43f8317403d69f50682dfb2de960a929efd58d107c4e15025e805ee2e1"
+    },
+    {
+      "id": "m003",
+      "family": "Uzunluk",
+      "text": "43.7 ±0.15",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 43.7,
+        "lowerTolerance": -0.15,
+        "upperTolerance": 0.15
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "rotation": 90,
+      "file": "m003.png",
+      "width": 53,
+      "height": 118,
+      "sha256": "024d4d9d01b8450dc205cd6df48dcc8023e4ae9113f8be995efb253c112b98a6"
+    },
+    {
+      "id": "m004",
+      "family": "Uzunluk",
+      "text": "28.4 +0.3/-0.1",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 28.4,
+        "lowerTolerance": -0.1,
+        "upperTolerance": 0.3
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m004.png",
+      "width": 317,
+      "height": 92,
+      "sha256": "9d71e7c490c5addd7562aee0ce24f667f6932aac3d9066590233e71cb9e26fbd"
+    },
+    {
+      "id": "m005",
+      "family": "Uzunluk",
+      "text": "36 +0.2/0",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 36,
+        "lowerTolerance": 0,
+        "upperTolerance": 0.2
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m005.png",
+      "width": 218,
+      "height": 92,
+      "sha256": "94e7efb8f70b06a53822692dacaf875318db4910e83e26f3e0fdeb79c842638e"
+    },
+    {
+      "id": "m006",
+      "family": "Uzunluk",
+      "text": "19 0/-0.05",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 19,
+        "lowerTolerance": -0.05,
+        "upperTolerance": 0
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m006.png",
+      "width": 234,
+      "height": 92,
+      "sha256": "68b5395920a382e26e14485794e1291e896e292f510750eb436106222125e860"
+    },
+    {
+      "id": "m007",
+      "family": "Uzunluk",
+      "text": "22 (+0.3/+0.1)",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 22,
+        "lowerTolerance": 0.1,
+        "upperTolerance": 0.3
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m007.png",
+      "width": 264,
+      "height": 92,
+      "sha256": "7b856e706965f4cb8a9922c50bd1216e3deb03bcdd7be52a69333a23d2913b1d"
+    },
+    {
+      "id": "m008",
+      "family": "Uzunluk",
+      "text": "14 (-0.2/-0.1)",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 14,
+        "lowerTolerance": -0.2,
+        "upperTolerance": -0.1
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m008.png",
+      "width": 259,
+      "height": 92,
+      "sha256": "4e7a8a40b420c19a12c1d0f10d0d7a933f3638ca1a6476846796c7f582c92a85"
+    },
+    {
+      "id": "m009",
+      "family": "Uzunluk",
+      "text": "47.5",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 47.5,
+        "lowerTolerance": -0.08,
+        "upperTolerance": 0.12
+      },
+      "standard": "ISO 129-1",
+      "layout": "stacked",
+      "upper": "+0.12",
+      "lower": "-0.08",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m009.png",
+      "width": 197,
+      "height": 150,
+      "sha256": "99211f9a40739d97a35c2b3dca858430f62a6a38651247bef8c724141059757f"
+    },
+    {
+      "id": "m010",
+      "family": "Uzunluk",
+      "text": "62",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 62,
+        "lowerTolerance": 0,
+        "upperTolerance": 0.25
+      },
+      "standard": "ISO 129-1",
+      "layout": "stacked",
+      "upper": "+0.25",
+      "lower": "0",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m010.png",
+      "width": 170,
+      "height": 150,
+      "sha256": "a807210f61bb93f2258e2065f641a4cd64eaad3b94b5695e3e7746d0ff61de1c"
+    },
+    {
+      "id": "m011",
+      "family": "Uzunluk",
+      "text": "0.739",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 0.734,
+        "lowerLimit": 0.729,
+        "upperLimit": 0.739
+      },
+      "standard": "ASME Y14.5",
+      "layout": "limits",
+      "lower": "0.729",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m011.png",
+      "width": 71,
+      "height": 87,
+      "sha256": "6adb1c0de1fc8682390eacebe5fe1d445665a45465b82e5aa8466cd29127529a"
+    },
+    {
+      "id": "m012",
+      "family": "Uzunluk",
+      "text": "8.35 MAX 8.15 MIN",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 8.25,
+        "lowerLimit": 8.15,
+        "upperLimit": 8.35
+      },
+      "standard": "ASME Y14.5",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m012.png",
+      "width": 400,
+      "height": 92,
+      "sha256": "0ca7066f66edc29b984d4d2d0c97973089faa482e6aa5c90095fc262c4834d48"
+    },
+    {
+      "id": "m013",
+      "family": "Uzunluk",
+      "text": "0.625 in",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 0.625,
+        "unit": "in"
+      },
+      "standard": "ASME Y14.5",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m013.png",
+      "width": 198,
+      "height": 92,
+      "sha256": "7628e10d68ed4d289b2b64d556cadbe50c7035d1da687270e327a3c91d79db5b"
+    },
+    {
+      "id": "m014",
+      "family": "Uzunluk",
+      "text": "25",
+      "expected": {
+        "type": "Uzunluk",
+        "nominalValue": 25,
+        "lowerTolerance": -0.2,
+        "upperTolerance": 0.2
+      },
+      "standard": "ISO 2768-mK",
+      "generalTolerance": "ISO 2768-mK",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m014.png",
+      "width": 84,
+      "height": 92,
+      "sha256": "59522e996c616580c33f731b421027592f5a8f88b512e103424073f9e8d09980"
+    },
+    {
+      "id": "m015",
+      "family": "Çap",
+      "text": "Ø17.35",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 17.35
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m015.png",
+      "width": 149,
+      "height": 92,
+      "sha256": "f264f290d7f287c943b4964adc007b165112c9919e5e01c4219f275c26fa28e4"
+    },
+    {
+      "id": "m016",
+      "family": "Çap",
+      "text": "Ø42.8 ±0.03",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 42.8,
+        "lowerTolerance": -0.03,
+        "upperTolerance": 0.03
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m016.png",
+      "width": 242,
+      "height": 92,
+      "sha256": "f36c2511292719bd3134e5bb5e09871fa879cedf0f3c0dcd350fa78ca6de922c"
+    },
+    {
+      "id": "m017",
+      "family": "Çap",
+      "text": "Ø 31,75 ±0,04",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 31.75,
+        "lowerTolerance": -0.04,
+        "upperTolerance": 0.04
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m017.png",
+      "width": 298,
+      "height": 92,
+      "sha256": "23b1566971d04a88992fd52af946d04fa52e7290e46a70677f3e7713e1ec02b2"
+    },
+    {
+      "id": "m018",
+      "family": "Çap",
+      "text": "Ø51.6",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 51.6,
+        "lowerTolerance": -0.06,
+        "upperTolerance": 0
+      },
+      "standard": "ISO 129-1",
+      "layout": "stacked",
+      "upper": "0",
+      "lower": "-0.06",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m018.png",
+      "width": 225,
+      "height": 150,
+      "sha256": "7c6634abf083b67c6450ae02efaf813cd7e8dd8b6f206592a7439d790c97f8ce"
+    },
+    {
+      "id": "m019",
+      "family": "Çap",
+      "text": "Ø8.4",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 8.4,
+        "lowerTolerance": -0.02,
+        "upperTolerance": 0.04
+      },
+      "standard": "ISO 129-1",
+      "layout": "stacked",
+      "upper": "+0.04",
+      "lower": "-0.02",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m019.png",
+      "width": 106,
+      "height": 87,
+      "sha256": "06300f2cbf6a68d9823fbb1458870290f6f6edafe92eb6f365e72d90a2b81d89"
+    },
+    {
+      "id": "m020",
+      "family": "Çap",
+      "text": "0.367",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 0.363,
+        "lowerLimit": 0.359,
+        "upperLimit": 0.367
+      },
+      "standard": "ASME Y14.5",
+      "layout": "limits",
+      "prefix": "Ø",
+      "lower": "0.359",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m020.png",
+      "width": 180,
+      "height": 150,
+      "sha256": "7fa2061ec035355cd4478b9772701ea61256ea64e70de66a479a9501d488595b"
+    },
+    {
+      "id": "m021",
+      "family": "Çap",
+      "text": "4x Ø7.5 ±0.05",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 7.5,
+        "quantity": 4,
+        "lowerTolerance": -0.05,
+        "upperTolerance": 0.05
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m021.png",
+      "width": 298,
+      "height": 92,
+      "sha256": "2c4fdcd4afacc2b3f1a596c65b6dc859bac82a308271478c2deedf047cd2213b"
+    },
+    {
+      "id": "m022",
+      "family": "Çap",
+      "text": "Ø11.8 THRU",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 11.8,
+        "callout.through": true
+      },
+      "standard": "ASME Y14.5",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m022.png",
+      "width": 261,
+      "height": 92,
+      "sha256": "d5c1064d1b39985563c04d2f3ab2b009ca83de6fc8e83b9a82b2184e7502f90c"
+    },
+    {
+      "id": "m023",
+      "family": "Çap",
+      "text": "Ø9 x 16 DEEP",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 9,
+        "callout.depth": "16"
+      },
+      "standard": "ASME Y14.5",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m023.png",
+      "width": 250,
+      "height": 92,
+      "sha256": "0efe42eb2d5254942277ac8733176cfa889677ae371347c0df774ba1a5695f16"
+    },
+    {
+      "id": "m024",
+      "family": "Çap",
+      "text": "Ø64.3 +0.04/0",
+      "expected": {
+        "type": "Çap",
+        "nominalValue": 64.3,
+        "lowerTolerance": 0,
+        "upperTolerance": 0.04
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m024.png",
+      "width": 276,
+      "height": 92,
+      "sha256": "48017de142206f95311b28bd13a76d8780b32e231d1088b2ecaaf877824c5d9f"
+    },
+    {
+      "id": "m025",
+      "family": "Yarıçap",
+      "text": "R7.25",
+      "expected": {
+        "type": "Yarıçap",
+        "nominalValue": 7.25
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m025.png",
+      "width": 138,
+      "height": 92,
+      "sha256": "eef2af2563b97407e85483edeb1c1b5cb26b4e464c7e86a88f6ed32160fed518"
+    },
+    {
+      "id": "m026",
+      "family": "Yarıçap",
+      "text": "R16 ±0.2",
+      "expected": {
+        "type": "Yarıçap",
+        "nominalValue": 16,
+        "lowerTolerance": -0.2,
+        "upperTolerance": 0.2
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m026.png",
+      "width": 210,
+      "height": 92,
+      "sha256": "2ecc682e618db4a66953dad8726885890f283cdce607ef76aa725967dda8140a"
+    },
+    {
+      "id": "m027",
+      "family": "Yarıçap",
+      "text": "R3,8",
+      "expected": {
+        "type": "Yarıçap",
+        "nominalValue": 3.8
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m027.png",
+      "width": 61,
+      "height": 53,
+      "sha256": "10a8ca3c7f60356ce8ce7b220d030ebfa074b232252d73e5cab1eee146cf2caa"
+    },
+    {
+      "id": "m028",
+      "family": "Yarıçap",
+      "text": "R48.5 +0.3/0",
+      "expected": {
+        "type": "Yarıçap",
+        "nominalValue": 48.5,
+        "lowerTolerance": 0,
+        "upperTolerance": 0.3
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m028.png",
+      "width": 289,
+      "height": 92,
+      "sha256": "199d9be5e0add5963e88a4c58baa8538e50d839237061c58035017fbff9dac2a"
+    },
+    {
+      "id": "m029",
+      "family": "Yarıçap",
+      "text": "R2.75 0/-0.05",
+      "expected": {
+        "type": "Yarıçap",
+        "nominalValue": 2.75,
+        "lowerTolerance": -0.05,
+        "upperTolerance": 0
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m029.png",
+      "width": 298,
+      "height": 92,
+      "sha256": "4a4debcc2645e98f97940a77e247d71e4579ffc4e0da2bf0c3fc1e059b64c118"
+    },
+    {
+      "id": "m030",
+      "family": "Yarıçap",
+      "text": "R125 ±0.5",
+      "expected": {
+        "type": "Yarıçap",
+        "nominalValue": 125,
+        "lowerTolerance": -0.5,
+        "upperTolerance": 0.5
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "rotation": 270,
+      "file": "m030.png",
+      "width": 92,
+      "height": 233,
+      "sha256": "09991a2a504440820a4bd0e782ec325b80768300ee7ed18b0a3812faea20b725"
+    },
+    {
+      "id": "m031",
+      "family": "Açı",
+      "text": "37°",
+      "expected": {
+        "type": "Açı",
+        "nominalValue": 37
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m031.png",
+      "width": 90,
+      "height": 92,
+      "sha256": "b627bcdfb696ba8ae48d27d1a6b630a846dc7424e9b9906e88ef3d1d448c2844"
+    },
+    {
+      "id": "m032",
+      "family": "Açı",
+      "text": "60° ±0.5°",
+      "expected": {
+        "type": "Açı",
+        "nominalValue": 60,
+        "lowerTolerance": -0.5,
+        "upperTolerance": 0.5
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m032.png",
+      "width": 200,
+      "height": 92,
+      "sha256": "7914acba239fd1a831fc9144f3739fbb72be460dd1b79b71464292c25115b94f"
+    },
+    {
+      "id": "m033",
+      "family": "Açı",
+      "text": "22.5° ±0.2°",
+      "expected": {
+        "type": "Açı",
+        "nominalValue": 22.5,
+        "lowerTolerance": -0.2,
+        "upperTolerance": 0.2
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m033.png",
+      "width": 258,
+      "height": 92,
+      "sha256": "7e12ea8a1bd2e406408682612e1c6a4c458b5cf9009578fb90bdc688026eb309"
+    },
+    {
+      "id": "m034",
+      "family": "Açı",
+      "text": "15° 30′",
+      "expected": {
+        "type": "Açı",
+        "nominalValue": 15.5
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m034.png",
+      "width": 176,
+      "height": 92,
+      "sha256": "aca78d2971125c6b2baa3cad99dfb57981396ce59da45be7a9f766b82366191f"
+    },
+    {
+      "id": "m035",
+      "family": "Açı",
+      "text": "75° ±30′",
+      "expected": {
+        "type": "Açı",
+        "nominalValue": 75,
+        "lowerTolerance": -0.5,
+        "upperTolerance": 0.5
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "rotation": 90,
+      "file": "m035.png",
+      "width": 53,
+      "height": 99,
+      "sha256": "2aa6f76fc8e5caaca80e2b39faf268812a613195c93a4a5df96890278660d60b"
+    },
+    {
+      "id": "m036",
+      "family": "Açı",
+      "text": "120° +1°/-0.5°",
+      "expected": {
+        "type": "Açı",
+        "nominalValue": 120,
+        "lowerTolerance": -0.5,
+        "upperTolerance": 1
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m036.png",
+      "width": 326,
+      "height": 92,
+      "sha256": "5aab4eaeacfd3d616252ea8d7a9ebb1af6b813218348f59b925be8f31316d29f"
+    },
+    {
+      "id": "m037",
+      "family": "Diş",
+      "text": "M5",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 5,
+        "threadPitch": "",
+        "threadClass": "",
+        "threadStandard": "ISO 261",
+        "unit": "mm"
+      },
+      "standard": "ISO 261",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m037.png",
+      "width": 78,
+      "height": 92,
+      "sha256": "dedfeaccadde9150574b2513cb8259fc235e5f51d438edcf8888a603a9e66a71"
+    },
+    {
+      "id": "m038",
+      "family": "Diş",
+      "text": "M10x1.25-6H",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 10,
+        "threadPitch": 1.25,
+        "threadClass": "6H",
+        "threadStandard": "ISO 261 / ISO 965-1",
+        "unit": "mm"
+      },
+      "standard": "ISO 261 / ISO 965-1",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m038.png",
+      "width": 283,
+      "height": 92,
+      "sha256": "1f1da3a36ed3ef6a7f9e03b10948a86da80dd217e7cb690c94bd248f3c10c0bb"
+    },
+    {
+      "id": "m039",
+      "family": "Diş",
+      "text": "M16x2-6g",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 16,
+        "threadPitch": 2,
+        "threadClass": "6g",
+        "threadStandard": "ISO 261 / ISO 965-1",
+        "unit": "mm"
+      },
+      "standard": "ISO 261 / ISO 965-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m039.png",
+      "width": 198,
+      "height": 92,
+      "sha256": "e586f9ee548e2f8ff6e8ae085b5e9fccf1885e49eb802c18337ef4adb8112370"
+    },
+    {
+      "id": "m040",
+      "family": "Diş",
+      "text": "M24x1.5-6H",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 24,
+        "threadPitch": 1.5,
+        "threadClass": "6H",
+        "threadStandard": "ISO 261 / ISO 965-1",
+        "unit": "mm"
+      },
+      "standard": "ISO 261 / ISO 965-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m040.png",
+      "width": 232,
+      "height": 92,
+      "sha256": "fb185d51ab926d8b2c6fa5f114239f588506aa2bc9ee8d66247773ab6b9b891e"
+    },
+    {
+      "id": "m041",
+      "family": "Diş",
+      "text": "M8 × 1,0-6H",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 8,
+        "threadPitch": 1,
+        "threadClass": "6H",
+        "threadStandard": "ISO 261 / ISO 965-1",
+        "unit": "mm"
+      },
+      "standard": "ISO 261 / ISO 965-1",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m041.png",
+      "width": 258,
+      "height": 92,
+      "sha256": "810fe50b516b90427e732a763331b831d863ff60099d27a1d6fe647240dd1a3f"
+    },
+    {
+      "id": "m042",
+      "family": "Diş",
+      "text": "M20x2.5-6g",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 20,
+        "threadPitch": 2.5,
+        "threadClass": "6g",
+        "threadStandard": "ISO 261 / ISO 965-1",
+        "unit": "mm"
+      },
+      "standard": "ISO 261 / ISO 965-1",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m042.png",
+      "width": 255,
+      "height": 92,
+      "sha256": "f39930f25021320935ae908a725962b28bb4d0d9d0a531760e12ab45e572687f"
+    },
+    {
+      "id": "m043",
+      "family": "Diş",
+      "text": "3/8-16 UNC-2B",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.375,
+        "threadPitch": "16 TPI",
+        "threadClass": "2B",
+        "threadStandard": "ASME B1.1",
+        "unit": "in"
+      },
+      "standard": "ASME B1.1",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m043.png",
+      "width": 162,
+      "height": 53,
+      "sha256": "b700eed4ed1faa1865006582328c9b3078234b62af92a97e5b74b87f9c44903d"
+    },
+    {
+      "id": "m044",
+      "family": "Diş",
+      "text": "1/2-20 UNF-2A",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.5,
+        "threadPitch": "20 TPI",
+        "threadClass": "2A",
+        "threadStandard": "ASME B1.1",
+        "unit": "in"
+      },
+      "standard": "ASME B1.1",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m044.png",
+      "width": 317,
+      "height": 92,
+      "sha256": "66cf071f119e028d64f4723c3d02da83f4aa2a6de4e0329847a58533cbf1407f"
+    },
+    {
+      "id": "m045",
+      "family": "Diş",
+      "text": "#10-32 UNF-2B",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.19,
+        "threadPitch": "32 TPI",
+        "threadClass": "2B",
+        "threadStandard": "ASME B1.1",
+        "unit": "in"
+      },
+      "standard": "ASME B1.1",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m045.png",
+      "width": 298,
+      "height": 92,
+      "sha256": "6d0ec71013c39a7039ed0e41206b6b9dc4039c83fbbb8201c7e9ec7d9223629c"
+    },
+    {
+      "id": "m046",
+      "family": "Diş",
+      "text": "1/4-20 UNC-2A",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.25,
+        "threadPitch": "20 TPI",
+        "threadClass": "2A",
+        "threadStandard": "ASME B1.1",
+        "unit": "in"
+      },
+      "standard": "ASME B1.1",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m046.png",
+      "width": 317,
+      "height": 92,
+      "sha256": "728899a2c6bc10eb50fad786c25c506042181977471b838602e5e4bd7132b3a2"
+    },
+    {
+      "id": "m047",
+      "family": "Diş",
+      "text": "1/8-27 NPT",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.125,
+        "threadPitch": "27 TPI",
+        "threadClass": "NPT",
+        "threadStandard": "ASME B1.20.1",
+        "unit": "in"
+      },
+      "standard": "ASME B1.20.1",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m047.png",
+      "width": 218,
+      "height": 92,
+      "sha256": "706c4a8908c206c6f0bc38a686adfb810c9e62efe5f151702527265c900851fc"
+    },
+    {
+      "id": "m048",
+      "family": "Diş",
+      "text": "3/8-18 NPT",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.375,
+        "threadPitch": "18 TPI",
+        "threadClass": "NPT",
+        "threadStandard": "ASME B1.20.1",
+        "unit": "in"
+      },
+      "standard": "ASME B1.20.1",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m048.png",
+      "width": 221,
+      "height": 92,
+      "sha256": "2b0b870cbc5cd055e5710af47543b2179515a133f5aba230b8112fbe9c2eaf3e"
+    },
+    {
+      "id": "m049",
+      "family": "Diş",
+      "text": "1/4-18 NPTF",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.25,
+        "threadPitch": "18 TPI",
+        "threadClass": "NPTF",
+        "threadStandard": "ASME B1.20.3",
+        "unit": "in"
+      },
+      "standard": "ASME B1.20.3",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m049.png",
+      "width": 258,
+      "height": 92,
+      "sha256": "1a5bb1a39be2c7c8f273a2e7e23ff3e78d26f382197be346ec6fd2050350c2a6"
+    },
+    {
+      "id": "m050",
+      "family": "Diş",
+      "text": "1/2-14 NPSM",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.5,
+        "threadPitch": "14 TPI",
+        "threadClass": "NPSM",
+        "threadStandard": "ASME B1.20.1",
+        "unit": "in"
+      },
+      "standard": "ASME B1.20.1",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m050.png",
+      "width": 279,
+      "height": 92,
+      "sha256": "879b08cb5b5aa8bd223d35ddebbf38491d1901f6903667f8507ab0c84a6643cf"
+    },
+    {
+      "id": "m051",
+      "family": "Diş",
+      "text": "G 1/2 A",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.5,
+        "threadPitch": "14 TPI",
+        "threadClass": "A",
+        "threadStandard": "ISO 228-1",
+        "unit": "in"
+      },
+      "standard": "ISO 228-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m051.png",
+      "width": 92,
+      "height": 53,
+      "sha256": "c57099b5be05c8d7c301b637291a6c8fe1ca6858548eed6b2088adffe4c5fadc"
+    },
+    {
+      "id": "m052",
+      "family": "Diş",
+      "text": "Rc 1/4",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.25,
+        "threadPitch": "19 TPI",
+        "threadClass": "",
+        "threadStandard": "ISO 7-1",
+        "unit": "in"
+      },
+      "standard": "ISO 7-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m052.png",
+      "width": 160,
+      "height": 92,
+      "sha256": "85cf8df20717ee1bbf7b6dff54d64cf38d545e32ef804434ad30e54267da9ac0"
+    },
+    {
+      "id": "m053",
+      "family": "Diş",
+      "text": "Rp 3/8",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 0.375,
+        "threadPitch": "19 TPI",
+        "threadClass": "",
+        "threadStandard": "ISO 7-1",
+        "unit": "in"
+      },
+      "standard": "ISO 7-1",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m053.png",
+      "width": 158,
+      "height": 92,
+      "sha256": "51802e3043749f478001283ce28488f32965630f60fcb8d8b56e7643f51e63c5"
+    },
+    {
+      "id": "m054",
+      "family": "Diş",
+      "text": "Tr24x5",
+      "expected": {
+        "type": "Diş",
+        "nominalValue": 24,
+        "threadPitch": 5,
+        "threadClass": "",
+        "threadStandard": "ISO 2902",
+        "unit": "mm"
+      },
+      "standard": "ISO 2902",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m054.png",
+      "width": 165,
+      "height": 92,
+      "sha256": "535cddac6c9e07a4321e30d52da98c5ed87961051426ce71cf012b6fa959c0e2"
+    },
+    {
+      "id": "m055",
+      "family": "Geçme",
+      "text": "18 H7",
+      "expected": {
+        "type": "Geçme",
+        "nominalValue": 18,
+        "fitClass": "H7"
+      },
+      "standard": "ISO 286",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m055.png",
+      "width": 131,
+      "height": 92,
+      "sha256": "5b02eed6d38bc7ba13136273f19c24af5a7149547424fb51c60e1d51161dfe4c"
+    },
+    {
+      "id": "m056",
+      "family": "Geçme",
+      "text": "35 h6",
+      "expected": {
+        "type": "Geçme",
+        "nominalValue": 35,
+        "fitClass": "h6"
+      },
+      "standard": "ISO 286",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m056.png",
+      "width": 129,
+      "height": 92,
+      "sha256": "11dcb87f257044c8daf7b73a69ba17d473ded08d63e59dc2e82460d3a9553be6"
+    },
+    {
+      "id": "m057",
+      "family": "Geçme",
+      "text": "50 JS7",
+      "expected": {
+        "type": "Geçme",
+        "nominalValue": 50,
+        "fitClass": "JS7"
+      },
+      "standard": "ISO 286",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m057.png",
+      "width": 158,
+      "height": 92,
+      "sha256": "beccb90d653c660fae896dcd30bcd0c319f3bbbd9de3dcaa3de33f8c4b4b4dc4"
+    },
+    {
+      "id": "m058",
+      "family": "Geçme",
+      "text": "22 g6",
+      "expected": {
+        "type": "Geçme",
+        "nominalValue": 22,
+        "fitClass": "g6"
+      },
+      "standard": "ISO 286",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m058.png",
+      "width": 142,
+      "height": 92,
+      "sha256": "14c5ce42246ce7dcd51df44c3756763a6daf95e5606b5621247226c75c152beb"
+    },
+    {
+      "id": "m059",
+      "family": "Geçme",
+      "text": "16 H8",
+      "expected": {
+        "type": "Geçme",
+        "nominalValue": 16,
+        "fitClass": "H8"
+      },
+      "standard": "ISO 286",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m059.png",
+      "width": 76,
+      "height": 53,
+      "sha256": "74fe460f69c75d813d8205ca475a6e48ec973f66b32f5a14b363e50d50c2b2cf"
+    },
+    {
+      "id": "m060",
+      "family": "Geçme",
+      "text": "40 H7/g6",
+      "expected": {
+        "type": "Geçme",
+        "nominalValue": 40,
+        "fitClass": "H7/g6"
+      },
+      "standard": "ISO 286",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m060.png",
+      "width": 211,
+      "height": 92,
+      "sha256": "a895940b5eed54a564a2cb02346df69be8fdf01caea41ee4328a976464264c40"
+    },
+    {
+      "id": "m061",
+      "family": "Pah",
+      "text": "C0.8",
+      "expected": {
+        "type": "Pah",
+        "nominalValue": 0.8,
+        "chamferAngle": ""
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m061.png",
+      "width": 118,
+      "height": 92,
+      "sha256": "b5b05730ba4cf0e65b106c9bcaa7595c1a775f0a2c4675bf1ee0b39b6c67c014"
+    },
+    {
+      "id": "m062",
+      "family": "Pah",
+      "text": "1.5 x 45°",
+      "expected": {
+        "type": "Pah",
+        "nominalValue": 1.5,
+        "chamferAngle": 45
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m062.png",
+      "width": 210,
+      "height": 92,
+      "sha256": "7d0333b43320fbe0fa174c3b84ef6ac329d392f054c4b9af4e41f70e6585190a"
+    },
+    {
+      "id": "m063",
+      "family": "Pah",
+      "text": "2.5 x 30°",
+      "expected": {
+        "type": "Pah",
+        "nominalValue": 2.5,
+        "chamferAngle": 30
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m063.png",
+      "width": 173,
+      "height": 92,
+      "sha256": "9807c2cdb21d128d1c18daa678a7f0e5e4928ba88e1c6685625bf6a207bffdad"
+    },
+    {
+      "id": "m064",
+      "family": "Pah",
+      "text": "0.6 × 60°",
+      "expected": {
+        "type": "Pah",
+        "nominalValue": 0.6,
+        "chamferAngle": 60
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m064.png",
+      "width": 194,
+      "height": 92,
+      "sha256": "b7e16a6d7e54393c28fd835d0bbf9ef849390ef67af08406b94359f627c0583c"
+    },
+    {
+      "id": "m065",
+      "family": "Pah",
+      "text": "3 x 45°",
+      "expected": {
+        "type": "Pah",
+        "nominalValue": 3,
+        "chamferAngle": 45
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m065.png",
+      "width": 178,
+      "height": 92,
+      "sha256": "34fde694979e124c6095f84ac79ce97c9b03b31a3087ac17768e58f4b7ed64ee"
+    },
+    {
+      "id": "m066",
+      "family": "Pah",
+      "text": "PAH 1.2",
+      "expected": {
+        "type": "Pah",
+        "nominalValue": 1.2,
+        "chamferAngle": ""
+      },
+      "standard": "ISO 129-1",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m066.png",
+      "width": 184,
+      "height": 92,
+      "sha256": "19b8aba8050801ccced8f79e6f52b9ae8647469d4b1d3fe920404aacf036e504"
+    },
+    {
+      "id": "m067",
+      "family": "Yüzey",
+      "text": "Ra 0.8",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 0.8,
+        "specialDesignator": "Ra"
+      },
+      "standard": "ISO 21920",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m067.png",
+      "width": 78,
+      "height": 53,
+      "sha256": "d5718bf3be040a31ce5219158fdddf2d66d680815db92f3cf40abc4c1199db92"
+    },
+    {
+      "id": "m068",
+      "family": "Yüzey",
+      "text": "Rz 12.5",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 12.5,
+        "specialDesignator": "Rz"
+      },
+      "standard": "ISO 21920",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m068.png",
+      "width": 179,
+      "height": 92,
+      "sha256": "d6aebe2cc4041fc035fd7f2897df4db687b649924e44d63ab4d7c78898c45e59"
+    },
+    {
+      "id": "m069",
+      "family": "Yüzey",
+      "text": "Rq 2.5",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 2.5,
+        "specialDesignator": "Rq"
+      },
+      "standard": "ISO 21920",
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m069.png",
+      "width": 158,
+      "height": 92,
+      "sha256": "9e8531c7203b6dec6e2018b82c8aba81003b23eec6a746648d1bc1616dd0e0bc"
+    },
+    {
+      "id": "m070",
+      "family": "Yüzey",
+      "text": "Rt 20",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 20,
+        "specialDesignator": "Rt"
+      },
+      "standard": "ISO 21920",
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m070.png",
+      "width": 136,
+      "height": 92,
+      "sha256": "cad4628d1e63891a335a975ad2797e8c5b0579b3c557bf8d7da59830920fac8a"
+    },
+    {
+      "id": "m071",
+      "family": "Yüzey",
+      "text": "Rmax 6.3",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 6.3,
+        "specialDesignator": "Rmax"
+      },
+      "standard": "ISO 21920",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m071.png",
+      "width": 182,
+      "height": 92,
+      "sha256": "1414b7d8f9ab4cc01a689ef502a5c1e370ec9e0f001d0239f18c6ac6971d2d6b"
+    },
+    {
+      "id": "m072",
+      "family": "Yüzey",
+      "text": "Ra 3,2",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 3.2,
+        "specialDesignator": "Ra"
+      },
+      "standard": "ISO 21920",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m072.png",
+      "width": 141,
+      "height": 92,
+      "sha256": "b4fa7d33760e1b06b341656d177cc09d966000faba4b61a6ea8b07c19b703447"
+    },
+    {
+      "id": "m073",
+      "family": "Yüzey",
+      "text": "Ra 1.6 MAX",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 1.6,
+        "specialDesignator": "Ra"
+      },
+      "standard": "ISO 21920",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m073.png",
+      "width": 238,
+      "height": 92,
+      "sha256": "79efa47cbb23db8a6a3f2639965a74553dc185c131bd7b28c76e086f1bedaf32"
+    },
+    {
+      "id": "m074",
+      "family": "Yüzey",
+      "text": "Ra 63 µin",
+      "expected": {
+        "type": "Yüzey",
+        "nominalValue": 63,
+        "specialDesignator": "Ra"
+      },
+      "standard": "ASME B46.1",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m074.png",
+      "width": 213,
+      "height": 92,
+      "sha256": "a47255f773d081af296639a31326d1b9e777a9929ff14012a92729890393513a"
+    },
+    {
+      "id": "m075",
+      "family": "GD&T",
+      "text": "0.008",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "position",
+        "upperTolerance": 0.008,
+        "datumRefs": "A"
+      },
+      "standard": "ASME Y14.5",
+      "layout": "gdt",
+      "subtype": "position",
+      "datums": [
+        "A"
+      ],
+      "diameter": true,
+      "mmc": true,
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m075.png",
+      "width": 190,
+      "height": 50,
+      "sha256": "b2d018fe6094a1ebfd32daa872cbd54c34732fedde9f00dea1c96abae5f5eae7"
+    },
+    {
+      "id": "m076",
+      "family": "GD&T",
+      "text": "0.05",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "position",
+        "upperTolerance": 0.05,
+        "datumRefs": "A | B | C"
+      },
+      "standard": "ASME Y14.5",
+      "layout": "gdt",
+      "subtype": "position",
+      "datums": [
+        "A",
+        "B",
+        "C"
+      ],
+      "diameter": true,
+      "mmc": false,
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m076.png",
+      "width": 366,
+      "height": 86,
+      "sha256": "6db05620944f7bc1c7ced5d87c767041d0fe685e4d7377af8041dee38ee0ff5e"
+    },
+    {
+      "id": "m077",
+      "family": "GD&T",
+      "text": "0.12",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "flatness",
+        "upperTolerance": 0.12,
+        "datumRefs": ""
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "flatness",
+      "datums": [],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m077.png",
+      "width": 204,
+      "height": 86,
+      "sha256": "6a3d099002d783870260e73b13218baac771dccdcfe1418fbff140bf65711da5"
+    },
+    {
+      "id": "m078",
+      "family": "GD&T",
+      "text": "0.06",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "straightness",
+        "upperTolerance": 0.06,
+        "datumRefs": ""
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "straightness",
+      "datums": [],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m078.png",
+      "width": 206,
+      "height": 86,
+      "sha256": "3897812ecb732889ab44b6390b1d9ade836bbb05d29ef227e4796fddc63c0fe6"
+    },
+    {
+      "id": "m079",
+      "family": "GD&T",
+      "text": "0.04",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "perpendicularity",
+        "upperTolerance": 0.04,
+        "datumRefs": "A"
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "perpendicularity",
+      "datums": [
+        "A"
+      ],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m079.png",
+      "width": 239,
+      "height": 86,
+      "sha256": "d7a19c253bde02ff5d844d99bcc6deb481370a905e10ddb67ac7df453db00324"
+    },
+    {
+      "id": "m080",
+      "family": "GD&T",
+      "text": "0.07",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "parallelism",
+        "upperTolerance": 0.07,
+        "datumRefs": "B"
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "parallelism",
+      "datums": [
+        "B"
+      ],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m080.png",
+      "width": 243,
+      "height": 86,
+      "sha256": "b44775b606321bbd4b3521c4cba768a3cc92c158e03fb947d8d766b657b6e638"
+    },
+    {
+      "id": "m081",
+      "family": "GD&T",
+      "text": "0.03",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "circularity",
+        "upperTolerance": 0.03,
+        "datumRefs": ""
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "circularity",
+      "datums": [],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m081.png",
+      "width": 204,
+      "height": 86,
+      "sha256": "adf1b6b1fda9b07a88378b75eaccbd585aae387c12ee6985ca044ccb9ef938f7"
+    },
+    {
+      "id": "m082",
+      "family": "GD&T",
+      "text": "0.1",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "concentricity",
+        "upperTolerance": 0.1,
+        "datumRefs": "A"
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "concentricity",
+      "datums": [
+        "A"
+      ],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m082.png",
+      "width": 235,
+      "height": 86,
+      "sha256": "d40b150c7d46f2b470f78050385cd39791264d42320d26149d6ccb386b3a1226"
+    },
+    {
+      "id": "m083",
+      "family": "GD&T",
+      "text": "0.15",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "angularity",
+        "upperTolerance": 0.15,
+        "datumRefs": "B"
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "angularity",
+      "datums": [
+        "B"
+      ],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m083.png",
+      "width": 137,
+      "height": 50,
+      "sha256": "ade91c0f56ab25572e55ac1d8e1950fbdff8a16add1210aae3acfff7616508ba"
+    },
+    {
+      "id": "m084",
+      "family": "GD&T",
+      "text": "0.2",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "profile",
+        "upperTolerance": 0.2,
+        "datumRefs": "A"
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "profile",
+      "datums": [
+        "A"
+      ],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m084.png",
+      "width": 224,
+      "height": 86,
+      "sha256": "396dfb064e8e5384fbe11c2d58b33b1ac3fffd35e832c97b4599f0b91c7b7e4a"
+    },
+    {
+      "id": "m085",
+      "family": "GD&T",
+      "text": "0.3",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "profile_surface",
+        "upperTolerance": 0.3,
+        "datumRefs": "A | B"
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "profile_surface",
+      "datums": [
+        "A",
+        "B"
+      ],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m085.png",
+      "width": 278,
+      "height": 86,
+      "sha256": "cc9360992b997b2117edb912ca133f98e2416389a7a60f85a8392478a58f336f"
+    },
+    {
+      "id": "m086",
+      "family": "GD&T",
+      "text": "0.09",
+      "expected": {
+        "type": "GD&T",
+        "gdtSubtype": "runout",
+        "upperTolerance": 0.09,
+        "datumRefs": "C"
+      },
+      "standard": "ISO 1101",
+      "layout": "gdt",
+      "subtype": "runout",
+      "datums": [
+        "C"
+      ],
+      "diameter": false,
+      "mmc": false,
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m086.png",
+      "width": 258,
+      "height": 86,
+      "sha256": "7830ad00f927a873ac316bd2cc4f6aa2d7acef4da56d1d24e363ec00490ed183"
+    },
+    {
+      "id": "m087",
+      "family": "Datum",
+      "text": "DATUM A",
+      "expected": {
+        "type": "Datum",
+        "datumRefs": "A"
+      },
+      "standard": "ISO 5459",
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m087.png",
+      "width": 195,
+      "height": 92,
+      "sha256": "6633ac49f6efa2e5c0b3a5caf4589506a771cdc3a04813ff642af742df4a4f1d"
+    },
+    {
+      "id": "m088",
+      "family": "Datum",
+      "text": "DATUM D",
+      "expected": {
+        "type": "Datum",
+        "datumRefs": "D"
+      },
+      "standard": "ISO 5459",
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m088.png",
+      "width": 192,
+      "height": 92,
+      "sha256": "fcb7849dd1cafd46281a88e7b90944234a5fa9cd04fb1a9e840d7e575964ee77"
+    },
+    {
+      "id": "m089",
+      "family": "Tolerans",
+      "text": "±0.12",
+      "expected": {
+        "lowerTolerance": -0.12,
+        "upperTolerance": 0.12
+      },
+      "standard": "Drawing-specific",
+      "typeContext": "Tolerans",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m089.png",
+      "width": 138,
+      "height": 92,
+      "sha256": "0777b1d785aa57c1c89de01a60d58042744ee723c653c4441da59df0b4e2937a"
+    },
+    {
+      "id": "m090",
+      "family": "Tolerans",
+      "text": "±0.007",
+      "expected": {
+        "lowerTolerance": -0.007,
+        "upperTolerance": 0.007
+      },
+      "standard": "Drawing-specific",
+      "typeContext": "Tolerans",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m090.png",
+      "width": 172,
+      "height": 92,
+      "sha256": "4d1496fd32c7272d79e6c6539bc92cf53c607ee8216f67d1b872e115b8fe4fe1"
+    },
+    {
+      "id": "m091",
+      "family": "Not",
+      "text": "DEBURR ALL EDGES",
+      "expected": {
+        "type": "Not"
+      },
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m091.png",
+      "width": 205,
+      "height": 53,
+      "sha256": "c0c856aafda4e6ed5ab409279d7273b434d02612a6c22facd9b0dc9676ade999"
+    },
+    {
+      "id": "m092",
+      "family": "Not",
+      "text": "NOTE: BREAK SHARP EDGES",
+      "expected": {
+        "type": "Not"
+      },
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m092.png",
+      "width": 565,
+      "height": 92,
+      "sha256": "40cb5790e10a9fd2d23aa394ebb16f8fc3bc81d08d2a89d5fc513045d33f00ab"
+    },
+    {
+      "id": "m093",
+      "family": "Malzeme",
+      "text": "MATERIAL: 42CrMo4",
+      "expected": {
+        "type": "Malzeme"
+      },
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "fontFile": "consola.ttf",
+      "quality": "low-contrast",
+      "tracking": 0,
+      "file": "m093.png",
+      "width": 378,
+      "height": 92,
+      "sha256": "776d5588dc9d4031da627b856c5a143276a50dadc761de81e188b4e2676ef1bf"
+    },
+    {
+      "id": "m094",
+      "family": "Malzeme",
+      "text": "MALZEME: AL 6082",
+      "expected": {
+        "type": "Malzeme"
+      },
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "fontFile": "verdana.ttf",
+      "quality": "jpeg",
+      "tracking": 0,
+      "file": "m094.png",
+      "width": 393,
+      "height": 92,
+      "sha256": "bdcc101abdd7a16bdbb3773596bfe4dcaf3cbd3fbdf14bcbb94e31992fc0db8e"
+    },
+    {
+      "id": "m095",
+      "family": "Proses",
+      "text": "HEAT TREAT 56 HRC",
+      "expected": {
+        "type": "Proses"
+      },
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "fontFile": "segoeui.ttf",
+      "quality": "noise",
+      "tracking": 0,
+      "file": "m095.png",
+      "width": 363,
+      "height": 92,
+      "sha256": "ba9fc69a021d816a13876ba78e910f05c9b8a3ced0e4bb58e95a29a17a4085ea"
+    },
+    {
+      "id": "m096",
+      "family": "Proses",
+      "text": "COATING: ZINC 8 µm",
+      "expected": {
+        "type": "Proses"
+      },
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "fontFile": "tahoma.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m096.png",
+      "width": 384,
+      "height": 92,
+      "sha256": "bb9d857341334935d0e84490d31e8400297f87f345f0b5286d0d002618730a14"
+    },
+    {
+      "id": "m097",
+      "family": "Görsel",
+      "text": "NO VISIBLE CRACKS",
+      "expected": {},
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "typeContext": "Görsel",
+      "fontFile": "consola.ttf",
+      "quality": "clean",
+      "tracking": 0,
+      "file": "m097.png",
+      "width": 378,
+      "height": 92,
+      "sha256": "f2542512f31f5e1d42830a3d0fcd67308e9bfed6e0e309ea328c4e3c2e0a2466"
+    },
+    {
+      "id": "m098",
+      "family": "Görsel",
+      "text": "SURFACE FREE OF SCRATCHES",
+      "expected": {},
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "typeContext": "Görsel",
+      "fontFile": "verdana.ttf",
+      "quality": "blur",
+      "tracking": 0,
+      "file": "m098.png",
+      "width": 610,
+      "height": 92,
+      "sha256": "396683bdb3fc90a2eb393ec9e3ee9ab112ef3ab15ac520ee3922289d8eef19bc"
+    },
+    {
+      "id": "m099",
+      "family": "Diğer",
+      "text": "INSPECTION PER PLAN Q17",
+      "expected": {},
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "typeContext": "Diğer",
+      "fontFile": "segoeui.ttf",
+      "quality": "small",
+      "tracking": 0,
+      "file": "m099.png",
+      "width": 278,
+      "height": 53,
+      "sha256": "445db3f6aae86c8e7b550c81a9a247e31e2520076209d5823452fdf8fa4adb86"
+    },
+    {
+      "id": "m100",
+      "family": "Diğer",
+      "text": "MARK PART NUMBER",
+      "expected": {},
+      "standard": "Drawing-specific",
+      "textMode": true,
+      "typeContext": "Diğer",
+      "fontFile": "tahoma.ttf",
+      "quality": "tracking",
+      "tracking": 3,
+      "file": "m100.png",
+      "width": 425,
+      "height": 92,
+      "sha256": "a01e6f394708449eab506ec11e78570a10ce26f7dc4e6b3dbae1fb77f16a4bce"
+    }
+  ]
+}

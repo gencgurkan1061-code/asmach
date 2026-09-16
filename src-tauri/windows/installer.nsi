@@ -262,7 +262,7 @@ Function PageReinstall
   ${NSD_CreateRadioButton} 8u 92u 95% 18u "Temiz kurulum — mevcut sürümü kaldır, yeni sürümü kur"
   Pop $CleanRadio
   ${NSD_OnClick} $CleanRadio PageReinstallUpdateSelection
-  ${NSD_CreateLabel} 8u 120u 95% 30u "Temiz kurulum uygulama dosyalarını yeniler. Projeler, lisans ve kullanıcı ayarları silinmez."
+  ${NSD_CreateLabel} 8u 120u 95% 34u "Temiz kurulum uygulama dosyalarıyla birlikte yerel ayarları, lisansı ve kurtarma önbelleğini sıfırlar. Kendi klasörlerinize kaydettiğiniz proje dosyaları korunur."
   Pop $R1
   ${If} $ReinstallPageCheck = 2
     ${NSD_Check} $R3
@@ -305,16 +305,29 @@ Function PageLeaveReinstall
     MessageBox MB_ICONSTOP "Daha yeni bir sürüm yüklü. Eski sürüme geçiş engellendi. İsterseniz yalnızca Kaldır seçeneğini kullanabilirsiniz."
     Abort
   ${EndIf}
+  ${If} $ReinstallPageCheck = 3
+    MessageBox MB_OKCANCEL|MB_ICONEXCLAMATION "Temiz kurulum yerel ayarları, cihazdaki lisansı ve kurtarma önbelleğini sıfırlayacak. Kendi klasörlerinize kaydettiğiniz proje dosyaları korunacak. Devam edilsin mi?" IDOK +2
+    Abort
+  ${EndIf}
   ; License verification happens in the installed app on first launch.
 FunctionEnd
 
 Function RequireAppClosed
+  app_close_retry:
   nsis_tauri_utils::FindProcessCurrentUser "${MAINBINARYNAME}.exe"
   Pop $0
   ${If} $0 = 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Önce projenizi kaydedip ASMach uygulamasını kapatın (sistem tepsisi dahil), ardından yeniden deneyin. Kurulum uygulamayı zorla kapatmaz." /SD IDOK
-    Abort
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "ASMach şu anda açık. Projenizi kaydedip uygulamayı ve sistem tepsisi simgesini kapatın, ardından Yeniden Dene'ye basın. Kurulum açık projeyi korumak için uygulamayı zorla kapatmaz." IDRETRY app_close_retry IDCANCEL app_close_cancel
   ${EndIf}
+  Return
+  app_close_cancel:
+  Abort
+FunctionEnd
+
+Function CleanLocalData
+  DetailPrint "Yerel ayarlar, lisans ve kurtarma önbelleği temizleniyor."
+  RMDir /r "$APPDATA\${BUNDLEID}"
+  RMDir /r "$LOCALAPPDATA\${BUNDLEID}"
 FunctionEnd
 
 Function RemovePreviousVersion
@@ -608,8 +621,9 @@ Section Install
   !endif
 
   ${If} $ReinstallPageCheck = 3
-    DetailPrint "Adım 4 · Mevcut sürüm kaldırılıyor (kullanıcı verileri korunur)."
+    DetailPrint "Adım 4 · Mevcut sürüm kaldırılıyor ve yerel uygulama verileri sıfırlanıyor."
     Call RemovePreviousVersion
+    Call CleanLocalData
   ${EndIf}
   SetOutPath $INSTDIR
   DetailPrint "Adım 5 · Yeni sürüm dosyaları yükleniyor."

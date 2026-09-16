@@ -48,7 +48,7 @@
       if(!types.includes(parsed.type))throw new Error('Bu türü ana formdan düzenleyin.');
       if(root.ASMachRequirements.fieldProfile?.(parsed.type).nominal&&!numeric(parsed.nominalValue))throw new Error('Nominal değer okunamadı. Ölçüyü elle girin.');
       parsedSource={toleranceExplicit:parsed.toleranceExplicit,toleranceStandard:parsed.toleranceStandard,limitDimension:parsed.limitDimension===true,nominalSource:parsed.nominalSource||'',decimalPlaces:parsed.decimalPlaces};
-      parsedExtras=Object.fromEntries(['fitClass','threadPitch','threadClass','gdtSubtype','datumRefs','gdtFrame','quantity','chamferAngle','chamferAngleTolerance'].map(k=>[k,parsed[k]??(k==='gdtFrame'?null:k==='quantity'?1:'')]));
+      parsedExtras=Object.fromEntries(['fitClass','threadPitch','threadClass','threadStandard','gdtSubtype','datumRefs','gdtFrame','quantity','chamferAngle','chamferAngleTolerance'].map(k=>[k,parsed[k]??(k==='gdtFrame'?null:k==='quantity'?1:'')]));
       Object.assign(parsedExtras,parsedSource,{lowerLimit:parsed.lowerLimit,upperLimit:parsed.upperLimit,nominalValue:parsed.nominalValue,lowerTolerance:parsed.lowerTolerance,upperTolerance:parsed.upperTolerance});
       names.forEach(k=>{$(`[data-measure="${k}"]`).value=parsed[k]??'';});$('[data-region-text]').value=text;touched=true;refresh();
       $('[data-symmetric]').value=numeric(parsed.lowerTolerance)&&numeric(parsed.upperTolerance)&&Number(parsed.lowerTolerance)===-Number(parsed.upperTolerance)?String(Math.abs(Number(parsed.upperTolerance))):'';

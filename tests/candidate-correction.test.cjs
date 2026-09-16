@@ -37,3 +37,12 @@ test('Inline correction uses box OCR layout, page text, symbol scoring and mappe
   app.recognizeTextBoxes=()=>'';app.isReliableTechnicalText=()=>false;app.recognizeSnapshotAutomatically=async()=>({text:'⌖ | 0.1 | A',confidence:92,visualGdt:true});app.parseRequirement=()=>({type:'GD&T'});
   const frame=await root.ASMachCandidateCorrection.recognize(app,candidate,{box,snapshot:'old'});assert.equal(frame.text,'⌖ | 0.1 | A');assert.equal(frame.confidence,92);
 });
+
+test('Re-reading a manually rotated source preserves the exact locked page polygon even when OCR suggests another rotation',async()=>{
+ const root=fixture(),source=createCanvas(500,200),box=root.ASMachSnapshots.rotateBox({x:.3,y:.4,w:.2,h:.07},1400,900,-8);
+ root.ASMachAutoSelection={inspect:async()=>assert.fail('Manual angle must bypass geometry detection')};
+ const candidate={page:1,box,parsed:{type:'Uzunluk'},pageImage:{width:1400,height:900}};
+ const app={state:{currentPage:1,textBoxes:[]},captureExact:async()=>source.toDataURL(),loadImage,savedReviewSelection:()=>({rect:{cx:250,cy:100,w:300,h:100,angle:-8}}),recognizeTextBoxes:()=>'',isReliableTechnicalText:()=>false,parseRequirement:()=>({type:'Uzunluk'}),recognizeSnapshotAutomatically:async()=>({text:'103 (+0.05/0)',angle:90,confidence:95}),ocrCandidateScore:r=>r.confidence,recoverDiameterPrefix:t=>t};
+ const result=await root.ASMachCandidateCorrection.recognize(app,candidate,{box,autoApply:true});
+ assert.deepEqual(result.box,box);assert.equal(result.box.angleLocked,true);assert.equal(result.text,'103 (+0.05/0)');
+});

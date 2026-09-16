@@ -3689,7 +3689,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
               if(['nominalValue','lowerTolerance','upperTolerance','type','unit'].includes(field)){
                 const next={...selected,[field]:element.value,manualFields:[...new Set([...(selected.manualFields||[]),field])]};
                 if(['nominalValue','lowerTolerance','upperTolerance'].includes(field)){
-                  next.toleranceStandard='Manuel düzenleme';next.toleranceExplicit=true;
+                  if(field!=='nominalValue'){next.toleranceStandard='Manuel düzenleme';next.toleranceExplicit=true;}
                   if(!(selected.limitDimension&&field==='nominalValue'))recalculateAnnotationLimits(next);
                 }
                 void window.ASMachCharacteristicEditing.confirmCorrection(window.ASMachApp,selected,next);return;
@@ -3787,38 +3787,40 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             if (event.target === elements.ocrReviewModal) cancelOcrReview();
           });
           elements.ocrRecognizedText.addEventListener("input", updateOcrFieldsFromText);
+          for (const standard of ['ASME Y14.5-2018','ASME Y14.5-2009']) {
+            if (![...elements.ocrGeneralTolerance.options].some(o=>o.value===standard)) elements.ocrGeneralTolerance.add(new Option(standard+' · çizim alt/üst sapmaları',standard));
+          }
           elements.ocrGeneralTolerance.addEventListener("change", updateOcrFieldsFromText);
           const referenceField=document.createElement('div');referenceField.className='field';referenceField.id='ocrAngleReferenceField';referenceField.style.display='none';
           referenceField.innerHTML='<label for="ocrReferenceLength">AÇININ KISA KENARI (MM)</label><input id="ocrReferenceLength" type="number" min="0.01" step="any" placeholder="Genel açı toleransı için gerekli" />';
           elements.ocrGeneralTolerance.closest('.field').after(referenceField);
           document.querySelector('#ocrReferenceLength').addEventListener('change',updateOcrFieldsFromText);
           elements.ocrCharacteristicType.addEventListener("change", () => {
-            if(state.pendingRecognition){state.pendingRecognition.forcedType=elements.ocrCharacteristicType.value;state.pendingRecognition.sourceReparsed=true;}
-            updateOcrFieldsFromText();
+            changeOcrMeasurementType(elements.ocrCharacteristicType.value);
           });
           document.querySelector('#ocrGdtSubtype').addEventListener('change', event => {
             if (!state.pendingRecognition) return;
             state.pendingRecognition.forcedGdtSubtype = event.target.value;
             const parsed = parseOcrRequirement();
             renderOcrGdtFields(parsed);
-            updateOcrRequirement();
+            updateOcrRequirement(true);
           });
           for(const id of ['ocrDatum1','ocrDatum2','ocrDatum3'])document.querySelector('#'+id).addEventListener('input',()=>{
             const pending=state.pendingRecognition;if(!pending)return;
             const prior=window.ASMachRequirements.datumTokens(parseOcrRequirement().datumRefs);
             const values=['ocrDatum1','ocrDatum2','ocrDatum3'].map(key=>document.querySelector('#'+key).value.trim().toUpperCase());
-            pending.forcedDatumRefs=window.ASMachRequirements.datumTokens([...values,...prior.slice(3)].join(' | ')).join(' | ');
-            renderOcrGdtFields(parseOcrRequirement());updateOcrRequirement();
+            pending.forcedDatumRefs=window.ASMachRequirements.datumTokens(values.join(' | ')).join(' | ');
+            renderOcrGdtFields(parseOcrRequirement());updateOcrRequirement(true);
           });
           document.querySelector('#ocrDatumsReset').addEventListener('click',()=>{if(state.pendingRecognition){delete state.pendingRecognition.forcedDatumRefs;state.pendingRecognition.sourceReparsed=true;}updateOcrFieldsFromText();});
           document.querySelector('#ocrRequirement').addEventListener('input', event => {
             if (!state.pendingRecognition) return;
             state.pendingRecognition.requirementMode = 'manual';
             state.pendingRecognition.requirementDraft = event.target.value;
-            document.querySelector('#ocrRequirementHint').textContent = 'Manuel · Alanlar değişse de metniniz korunur.';
+            document.querySelector('#ocrRequirementHint').textContent = 'Manuel · Ölçü alanını değiştirirseniz gereklilik yeniden oluşturulur.';
           });
           document.querySelector('#ocrRequirementGenerate').addEventListener('click', () => updateOcrRequirement(true));
-          for (const input of [elements.ocrNominal,elements.ocrLowerTolerance,elements.ocrUpperTolerance,elements.ocrUnit]) input.addEventListener('input', () => updateOcrRequirement());
+          for (const [input,key] of [[elements.ocrNominal,'nominalValue'],[elements.ocrLowerTolerance,'lowerTolerance'],[elements.ocrUpperTolerance,'upperTolerance'],[elements.ocrUnit,'unit']]) input.addEventListener('input', () => updateOcrStructuredField(key,input.value));
           elements.retryLibrariesButton.addEventListener("click", () => window.location.reload());
           elements.modalCancelButton.addEventListener("click", () => closeConfirm(false));
           elements.modalConfirmButton.addEventListener("click", () => closeConfirm(true));
@@ -4107,6 +4109,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           const svg = visible
             .map(item=>window.ASMachRoleAppearance?.effective(state,item)||item)
             .map(item=>window.ASMachRepeatedCharacteristics?.drawingRecord(state,item)||item)
+            .map(item=>state.sourceRotationPreview?.id===item.id?{...item,selectionBox:state.sourceRotationPreview.box}:item)
             .map((item) => {
               const connection = boxConnection(item);
               const anchorX = connection.anchorX * canvas.width;
@@ -4299,7 +4302,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           subtypeSelect.replaceChildren(...window.ASMachRequirements.gdtOptions(subtype).map(item => new Option(item.label, item.value)));
           subtypeSelect.value = subtype;
           elements.requirement.value = selected.requirement;
-          document.querySelector('#requirementModeHint').textContent = selected.requirementMode === 'auto' ? 'Otomatik · Tür ve ölçü alanlarından oluşturulur.' : 'Manuel · Alanlar değişse de metniniz korunur.';
+          document.querySelector('#requirementModeHint').textContent = selected.requirementMode === 'auto' ? 'Otomatik · Tür ve ölçü alanlarından oluşturulur.' : 'Manuel · Ölçü alanını değiştirirseniz gereklilik yeniden oluşturulur.';
           elements.nominalValue.value = selected.nominalValue || "";
           elements.lowerTolerance.value = selected.lowerTolerance || "";
           elements.upperTolerance.value = selected.upperTolerance || "";
@@ -4686,6 +4689,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             id:crypto.randomUUID(),box,source:state.fileData,page:state.currentPage,
             scanMode:document.querySelector('#boxScanMode')?.value||'controlled',
             contentMode:document.querySelector('#boxContentMode')?.value||'auto',
+            measurementType:document.querySelector('#boxContentMode')?.value==='dimension'?(document.querySelector('#boxMeasurementType')?.value||''):'',
           });
           updateBoxRecognitionStatus(state.boxRecognitionRunning?'Yeni seçim sıraya alındı':'Tanıma başlatılıyor');
           renderOverlay();
@@ -4726,8 +4730,11 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           let smart = !existing && !candidateReview && (queueContext?.scanMode||document.querySelector('#boxScanMode')?.value) === 'smart';
           const contentMode=!existing&&!candidateReview?(queueContext?.contentMode||document.querySelector('#boxContentMode')?.value||'auto'):'auto';
           const noteMode=contentMode==='note';
+          const expectedMeasurementType=contentMode==='dimension'?(queueContext?.measurementType??document.querySelector('#boxMeasurementType')?.value??''):'';
           const sourceAtStart=state.fileData,pageAtStart=state.currentPage;
           const fresh=Boolean(candidateReview?.recognizeFresh);
+          const projectTolerance=state.generalTolerance?.standard||'';
+          if(projectTolerance&&(!existing||fresh)&&[...elements.ocrGeneralTolerance.options].some(option=>option.value===projectTolerance))elements.ocrGeneralTolerance.value=projectTolerance;
           document.querySelector('#ocrReferenceLength').value=fresh?'':existing?.referenceLength||'';
           const box = normalizeRecognitionBox(draft);
           if (!box) {
@@ -4779,10 +4786,10 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             const candidates = pdfText
               ? [{ text: pdfText, source: "PDF metin katmanı", confidence: 100 }]
               : [];
-            if (snapshot && (detectedSelection?.frame || !isReliableTechnicalText(pdfText) || parseTechnicalRequirement(pdfText).type === 'Uzunluk')) {
+            if (snapshot && (detectedSelection?.frame || !isReliableTechnicalText(pdfText) || parseTechnicalRequirement(pdfText).type === 'Uzunluk' || window.ASMachRequirements?.measurementIntentScore?.(pdfText,expectedMeasurementType,parseTechnicalRequirement(pdfText))<0)) {
               if(queueContext?.nonBlocking){state.boxRecognitionDetail='OCR motoru ölçü ve toleransları okuyor';updateBoxRecognitionStatus();}
               else setBusyDetail("OCR motoru ölçü ve toleransları okuyor");
-              const ocrResult = await recognizeSnapshotAutomatically(recognitionSnapshot,{skipGdt:noteMode,textMode:noteMode,nonBlocking:Boolean(queueContext?.nonBlocking)});
+              const ocrResult = await recognizeSnapshotAutomatically(recognitionSnapshot,{skipGdt:noteMode,textMode:noteMode,expectedMeasurementType,nonBlocking:Boolean(queueContext?.nonBlocking)});
               if(!noteMode&&!detectedSelection?.frame&&!Number.isFinite(angleHint)&&Number.isFinite(ocrResult.angle)&&ocrResult.confidence>=65&&window.ASMachAutoSelection){
                 const readingAngle=(detectedSelection?.rect.angle||0)-ocrResult.angle;
                 try{detectedSelection=await window.ASMachAutoSelection.inspect(snapshot,initialRect,{angleHint:readingAngle,paddingRatio:paddingRatioFor(recognitionMethod)});recognitionSnapshot=detectedSelection.snapshot;}catch{}
@@ -4792,7 +4799,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             }
             const best = candidates
               .filter((candidate) => candidate.text)
-              .sort((left, right) => Number(Boolean(right.visualGdt))-Number(Boolean(left.visualGdt)) || ocrCandidateScore(right) - ocrCandidateScore(left))[0];
+              .sort((left, right) => Number(Boolean(right.visualGdt))-Number(Boolean(left.visualGdt)) || ocrCandidateScore(right,expectedMeasurementType) - ocrCandidateScore(left,expectedMeasurementType))[0];
             if (best) {
               const gdtReading=existing?.type==='GD&T'||best.visualGdt||best.gdt||parseTechnicalRequirement(best.text).type==='GD&T';
               if(existing&&best.needsReview&&!gdtReading&&window.ASMachOcrEnhancement){const choice=await window.ASMachOcrEnhancement.review(best);if(!choice)return;Object.assign(best,choice);}
@@ -4823,11 +4830,13 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             recognitionSource = `${recognitionSource || "Metin tanıma"} · ${detectedStandard} çizim notundan seçildi`;
           }
           if(candidateReview?.isCurrent&&!candidateReview.isCurrent())throw new Error('Belge değişti. Tanıma sonucu uygulanmadı.');
-          const parsed = existing&&!fresh ? {...existing} : parseTechnicalRequirement(
+          const parsedBase = existing&&!fresh ? {...existing} : parseTechnicalRequirement(
             recognizedText,
             elements.ocrGeneralTolerance.value,
-            noteMode?'Not':contentMode==='gdt'?'GD&T':contentMode==='dimension'&&!['Uzunluk','Ölçü','Çap','Yarıçap','Pah','Açı','Diş','Geçme'].includes(parseTechnicalRequirement(recognizedText).type)?'Uzunluk':'',
+            noteMode?'Not':contentMode==='gdt'?'GD&T':expectedMeasurementType&&expectedMeasurementType!=='Limit ölçü'?expectedMeasurementType:contentMode==='dimension'&&!['Uzunluk','Ölçü','Çap','Yarıçap','Pah','Açı','Diş','Geçme','Yüzey'].includes(parseTechnicalRequirement(recognizedText).type)?'Uzunluk':'',
           );
+          const parsed=existing&&!fresh||!expectedMeasurementType?parsedBase:window.ASMachRequirements.applyMeasurementIntent(parsedBase,recognizedText,expectedMeasurementType);
+          if(expectedMeasurementType){recognitionSource=`${recognitionSource||'Metin tanıma'} · Beklenen tür: ${expectedMeasurementType}`;if(parsed.measurementIntentValid===false)smart=false;}
           const fittedBox=detectedSelection
             ? mapSnapshotSelection(sourceBox,{points:window.ASMachSnapshots._test.corners(detectedSelection.rect).map(p=>({x:p.x/detectedSelection.sourceWidth,y:p.y/detectedSelection.sourceHeight})),angle:detectedSelection.rect.angle})
             : box;
@@ -4997,23 +5006,62 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           if(state.pendingRecognition){state.pendingRecognition.reportCanvas=report?.canvas||null;state.snapshotEditor?.refresh();}
         }
 
+        function ocrRequirementRecord() {
+          const pending = state.pendingRecognition;
+          if (!pending) return null;
+          const base = {...pending.requirementParsed,...pending.structuredEdits};
+          const record = { ...base, type: elements.ocrCharacteristicType.value, nominalValue: elements.ocrNominal.value, lowerTolerance: elements.ocrLowerTolerance.value, upperTolerance: elements.ocrUpperTolerance.value, unit: elements.ocrUnit.value,
+            ocrText:elements.ocrRecognizedText.value, gdtSubtype: pending.forcedGdtSubtype ?? base.gdtSubtype, datumRefs:pending.forcedDatumRefs??base.datumRefs, requirement: pending.requirementDraft || '', requirementMode: pending.requirementMode || 'auto',manualFields:pending.requirementMode==='manual'?['requirement']:[] };
+          if (record.nominalValue !== base.nominalValue || record.lowerTolerance !== base.lowerTolerance || record.upperTolerance !== base.upperTolerance) {
+            record.gdtFrame = base.gdtFrame ? {...base.gdtFrame} : null;
+            if(base.limitDimension&&record.lowerTolerance===base.lowerTolerance&&record.upperTolerance===base.upperTolerance){
+              record.nominalSource='manual';
+              for(const [tolerance,limit] of [['lowerTolerance','lowerLimit'],['upperTolerance','upperLimit']])record[tolerance]=isFiniteTechnicalNumber(record.nominalValue)&&isFiniteTechnicalNumber(record[limit])?String(Number((Number(record[limit])-Number(record.nominalValue)).toFixed(12))):'';
+            }else recalculateAnnotationLimits(record);
+          }
+          return window.ASMachCharacteristicEditing.preserveSurfaceBound(base,record);
+        }
+
+        function updateOcrStructuredField(key,value) {
+          const pending=state.pendingRecognition;if(!pending)return;
+          const record=ocrRequirementRecord();record[key]=value;
+          if(['nominalValue','lowerTolerance','upperTolerance'].includes(key)){
+            if(key!=='nominalValue'){record.toleranceExplicit=true;record.toleranceStandard='Manuel giriş';}
+            if(record.limitDimension&&key==='nominalValue'){
+              record.nominalSource='manual';
+              for(const [tolerance,limit] of [['lowerTolerance','lowerLimit'],['upperTolerance','upperLimit']])record[tolerance]=isFiniteTechnicalNumber(value)&&isFiniteTechnicalNumber(record[limit])?String(Number((Number(record[limit])-Number(value)).toFixed(12))):'';
+            }else{record.limitDimension=false;record.nominalSource='';recalculateAnnotationLimits(record);Object.assign(record,window.ASMachCharacteristicEditing.preserveSurfaceBound({...pending.requirementParsed,...pending.structuredEdits},record));}
+          }
+          Object.assign(record,window.ASMachCharacteristicEditing.refreshGeneral(record,{...state.generalTolerance,standard:elements.ocrGeneralTolerance.value},parseTechnicalRequirement));
+          pending.structuredEdits={...pending.structuredEdits,[key]:value,...Object.fromEntries(['lowerTolerance','upperTolerance','lowerLimit','upperLimit','limitDimension','nominalSource','toleranceExplicit','toleranceStandard'].map(name=>[name,record[name]]))};
+          pending.requirementMode='auto';
+          elements.ocrLowerTolerance.value=record.lowerTolerance??'';elements.ocrUpperTolerance.value=record.upperTolerance??'';
+          updateOcrRequirement(true);
+        }
+
+        function changeOcrMeasurementType(type) {
+          const pending=state.pendingRecognition;if(!pending)return;
+          const previous=pending.structuredEdits?.type||pending.requirementParsed?.type;
+          const record=window.ASMachRequirements.transitionType({...ocrRequirementRecord(),type:previous},type);
+          record.unit=window.ASMachCharacteristicEditing.defaultUnitForType(type,state.generalTolerance?.unit);
+          Object.assign(record,window.ASMachCharacteristicEditing.refreshGeneral(record,{...state.generalTolerance,standard:elements.ocrGeneralTolerance.value},parseTechnicalRequirement));
+          pending.forcedType=type;pending.requirementMode='auto';pending.sourceReparsed=true;
+          if(!window.ASMachRequirements.fieldProfile(type).numeric){pending.textEditError='';elements.ocrReviewConfirmButton.disabled=Boolean(pending.reading||pending.readTimer);}
+          delete pending.forcedGdtSubtype;delete pending.forcedDatumRefs;
+          pending.structuredEdits=Object.fromEntries(['type','nominalValue','lowerTolerance','upperTolerance','lowerLimit','upperLimit','unit','toleranceStandard','toleranceExplicit','limitDimension','nominalSource','gdtSubtype','gdtFrame','datumRefs','threadPitch','threadClass','threadStandard','fitClass','chamferAngle','chamferAngleTolerance','angleFormat','surfaceTexture','specialDesignator','callout','referenceLength','evaluationMethod'].map(key=>[key,record[key]]));
+          applyParsedOcrFields(record,pending.recognitionSource||'Elle seçilen ölçü türü');
+        }
+
         function updateOcrRequirement(force = false) {
           const pending = state.pendingRecognition;
           if (!pending) return;
-          const base = {...pending.requirementParsed,...pending.structuredEdits};
-          const record = { ...base, type: elements.ocrCharacteristicType.value, nominalValue: elements.ocrNominal.value, lowerTolerance: elements.ocrLowerTolerance.value, upperTolerance: elements.ocrUpperTolerance.value, unit: elements.ocrUnit.value,
-            gdtSubtype: pending.forcedGdtSubtype ?? base.gdtSubtype, datumRefs:pending.forcedDatumRefs??base.datumRefs, requirement: pending.requirementDraft || '', requirementMode: pending.requirementMode || 'auto' };
-          if (record.nominalValue !== base.nominalValue || record.lowerTolerance !== base.lowerTolerance || record.upperTolerance !== base.upperTolerance) {
-            record.gdtFrame = base.gdtFrame ? {...base.gdtFrame} : null;
-            recalculateAnnotationLimits(record);
-          }
-          if (force && window.ASMachRequirements.generateRequirement(record) === null) { toast('Alanlar yeterli değil; gerekliliği elle girin.', true); return; }
-          const updated = window.ASMachRequirements.syncRequirement(record, force);
+          const record=ocrRequirementRecord();
+          const updated = window.ASMachRequirements.syncRequirement(record, force,{clearIncomplete:true});
           updateOcrGdtReport(updated);
           pending.requirementMode = updated.requirementMode;
           pending.requirementDraft = updated.requirement;
           document.querySelector('#ocrRequirement').value = updated.requirement;
-          document.querySelector('#ocrRequirementHint').textContent = updated.requirementMode === 'auto' ? 'Otomatik · Tür, nominal ve toleranslardan oluşturulur.' : 'Manuel · Alanlar değişse de metniniz korunur.';
+          document.querySelector('#ocrRequirementHint').textContent = updated.requirementMode === 'auto' ? updated.requirement?'Otomatik · Ölçü alanlarından oluşturulur.':'Otomatik · Gereklilik için eksik ölçü alanlarını tamamlayın.' : 'Manuel · Ölçü alanını değiştirirseniz gereklilik yeniden oluşturulur.';
         }
 
         function applyParsedOcrFields(parsed, recognitionSource = "") {
@@ -5065,8 +5113,29 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
         }
 
         function updateOcrFieldsFromText(event) {
-          if(event&&state.pendingRecognition)state.pendingRecognition.sourceReparsed=true;
+          const pending=state.pendingRecognition;
+          const sourceEdited=Boolean(event&&event.target===elements.ocrRecognizedText);
+          const preserved=pending?Object.fromEntries(['sourceReparsed','requirementMode','structuredEdits','forcedGdtSubtype','forcedDatumRefs','forcedType','requirementDraft'].map(key=>[key,pending[key]])):null;
+          if(event&&pending){
+            pending.sourceReparsed=true;pending.requirementMode='auto';
+            if(event.target===elements.ocrRecognizedText){
+              pending.structuredEdits={};delete pending.forcedGdtSubtype;delete pending.forcedDatumRefs;
+              if(pending.forcedType!=='Not')delete pending.forcedType;
+              pending.requirementDraft='';
+            }
+          }
           const parsed = parseOcrRequirement();
+          if(sourceEdited&&pending){
+            const hasNumeric=['nominalValue','upperTolerance','lowerLimit','upperLimit'].some(key=>isFiniteTechnicalNumber(parsed[key]));
+            const numericExpected=window.ASMachRequirements.fieldProfile(parsed.type).numeric||window.ASMachRequirements.fieldProfile(pending.requirementParsed?.type).numeric&&pending.forcedType!=='Not';
+            if(!elements.ocrRecognizedText.value.trim()||parsed.toleranceAmbiguous||numericExpected&&!hasNumeric){
+              Object.assign(pending,preserved);
+              pending.textEditError=parsed.toleranceAmbiguous?(parsed.parseWarnings||[]).join(' '):'Ölçü metni tamamlanmadı veya doğrulanamadı.';
+              elements.ocrStatusText.textContent=pending.textEditError+' Önceki ölçü alanları korundu; metni düzeltin.';
+              elements.ocrReviewConfirmButton.disabled=true;return;
+            }
+            pending.textEditError='';elements.ocrReviewConfirmButton.disabled=Boolean(pending.reading||pending.readTimer);
+          }
           applyParsedOcrFields(parsed, state.pendingRecognition?.recognitionSource || "Metin tanıma");
         }
 
@@ -5086,7 +5155,8 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           pending.reading=true;
           const snapshot=pending.snapshot;
           const editor=document.querySelector('#ocrSnapshotEditor');editor.inert=true;
-          const current=()=>state.pendingRecognition===pending&&pending.snapshot===snapshot;
+          const readingId=(pending.readingId||0)+1;pending.readingId=readingId;
+          const current=()=>state.pendingRecognition===pending&&pending.snapshot===snapshot&&pending.readingId===readingId;
           try {
             const result = await recognizeSnapshotAutomatically(snapshot, { forceAll: !options.automatic,skipGdt:pending.forcedType==='Not',textMode:pending.forcedType==='Not' });
             if(!current())return;
@@ -5110,6 +5180,8 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             if(!current())return;
             delete pending.forcedDatumRefs;
             pending.structuredEdits={};
+            pending.requirementMode='auto';pending.requirementDraft='';
+            pending.textEditError='';
             pending.recognizedText = result.text;
             pending.recognitionSource = result.source;
             pending.recognitionConfidence = Number(result.confidence) || 0;
@@ -5130,8 +5202,8 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             toast(pending.recognitionError, true);
           } finally {
             hideBusy();
-            pending.reading=false;
-            if(state.pendingRecognition===pending){editor.inert=false;elements.ocrRetryButton.disabled = false;elements.ocrReviewConfirmButton.disabled=Boolean(pending.readTimer);}
+            if(pending.readingId===readingId){pending.reading=false;
+            if(state.pendingRecognition===pending){editor.inert=false;elements.ocrRetryButton.disabled = false;elements.ocrReviewConfirmButton.disabled=Boolean(pending.readTimer||pending.textEditError);}}
           }
         }
 
@@ -5151,6 +5223,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
         function confirmOcrReview() {
           const pending = state.pendingRecognition;
           if (!pending) return;
+          if(pending.textEditError){toast(pending.textEditError+' OCR metnini düzeltin.',true);return;}
           if(pending.reading||pending.readTimer){toast('Ölçü ve toleransların okunmasını bekleyin.',true);return;}
           const inlineMethod=document.querySelector('#ocrInspectionMethod')?.value;
           const frequency=window.ASMachOcrReviewControls?.frequency()||{};
@@ -5204,6 +5277,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             fitClass: parsed.fitClass,
             threadPitch: parsed.threadPitch,
             threadClass: parsed.threadClass,
+            threadStandard: parsed.threadStandard,
             gdtSubtype: parsed.gdtSubtype,
             datumRefs: parsed.datumRefs,
             specialDesignator: parsed.specialDesignator,
@@ -5217,6 +5291,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             lowerInclusive: parsed.lowerInclusive,
             upperInclusive: parsed.upperInclusive,
             parseWarnings: parsed.parseWarnings,
+            measurementEvidence: parsed.measurementEvidence,
             detectionConfidence: pending.recognitionConfidence,
             recognitionSource: pending.recognitionSource,
             originalOcrText: pending.originalOcrText||pending.recognizedText||'',
@@ -5233,7 +5308,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           };
           if(window.ASMachOcrReviewControls)state.pendingAnchor=window.ASMachOcrReviewControls.sanitize(state.pendingAnchor);
           state.pendingAnchor = window.ASMachRequirements.withGdtSubtype(state.pendingAnchor);
-          state.pendingAnchor = window.ASMachRequirements.syncRequirement(state.pendingAnchor);
+          state.pendingAnchor = window.ASMachRequirements.syncRequirement(state.pendingAnchor,pending.requirementMode!=='manual');
           if(pending.candidateReview){
             const result={...state.pendingAnchor,inspectionMethod:inlineMethod};
             delete result.editingId;delete result.reviewInline;
@@ -5283,6 +5358,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             ocrText: pending.ocrText || "",
             nominalValue: pending.nominalValue || "",
             nominalSource: pending.nominalSource || '',
+            measurementEvidence: pending.measurementEvidence,
             limitDimension: pending.limitDimension === true,
             decimalPlaces: pending.decimalPlaces,
             angleFormat: pending.angleFormat,
@@ -5297,6 +5373,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             fitClass: pending.fitClass || "",
             threadPitch: pending.threadPitch || "",
             threadClass: pending.threadClass || "",
+            threadStandard: pending.threadStandard || "",
             gdtSubtype: pending.gdtSubtype || "",
             selectionBox: pending.selectionBox || null,
             snapshot: pending.snapshot || "",
@@ -5798,6 +5875,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             "Geçme Sınıfı",
             "Diş Adımı",
             "Diş Sınıfı",
+            "Diş Standardı",
             "GD&T Türü",
             "Kontrol Yöntemi",
             "Durum",
@@ -5820,6 +5898,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
               item.fitClass,
               item.threadPitch,
               item.threadClass,
+              item.threadStandard,
               item.gdtSubtype,
               inspectionMethodLabel(item.inspectionMethod),
               statusLabel(item.status),
@@ -6718,9 +6797,10 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
           return !parsed.parseWarnings?.length && (parsed.toleranceExplicit || parsed.fitClass || parsed.threadClass || /^[ØR]?\s*\d+(?:[.,]\d+)?\s*(?:mm|°)?$/i.test(text));
         }
 
-        function ocrCandidateScore(candidate) {
+        function ocrCandidateScore(candidate, expectedMeasurementType = '') {
           const incomplete = window.ASMachWorkflow && !window.ASMachWorkflow.technicalScore(candidate.text);
-          return technicalTextScore(candidate.text) + (Number(candidate.confidence) || 0)*0.35 - (candidate.text.includes("�") ? 60 : 0) - (incomplete ? 70 : 0);
+          const intentScore=window.ASMachRequirements?.measurementIntentScore?.(candidate.text,expectedMeasurementType,parseTechnicalRequirement(candidate.text))||0;
+          return technicalTextScore(candidate.text) + (Number(candidate.confidence) || 0)*0.35 + intentScore - (candidate.text.includes("�") ? 60 : 0) - (incomplete ? 70 : 0);
         }
 
         async function recognizeSnapshotAutomatically(snapshot, options = {}) {
@@ -6749,14 +6829,14 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
         }
 
         function parseTechnicalRequirement(rawText, generalToleranceStandard = "", typeOverride = "", referenceLength = 0) {
-          if(typeOverride==='Not')return {type:'Not',requirement:String(rawText||'').trim(),requirementMode:'manual',nominalValue:'',unit:'',lowerTolerance:'',upperTolerance:'',lowerLimit:'',upperLimit:'',toleranceStandard:'',toleranceExplicit:false,fitClass:'',threadClass:'',threadPitch:'',gdtSubtype:'',datumRefs:'',gdtFrame:null,parseWarnings:[],evaluationMethod:'OK_NOT_OK'};
+          if(typeOverride==='Not')return {type:'Not',requirement:String(rawText||'').trim(),requirementMode:'manual',nominalValue:'',unit:'',lowerTolerance:'',upperTolerance:'',lowerLimit:'',upperLimit:'',toleranceStandard:'',toleranceExplicit:false,fitClass:'',threadClass:'',threadPitch:'',threadStandard:'',gdtSubtype:'',datumRefs:'',gdtFrame:null,parseWarnings:[],evaluationMethod:'OK_NOT_OK'};
           const parsed = window.ASMachRequirements
             ? window.ASMachRequirements.parse(rawText, "", parseTechnicalRequirementLegacy)
             : parseTechnicalRequirementLegacy(rawText, "");
           if(typeOverride) parsed.type=typeOverride;
           if(state.generalTolerance?.unit==='in'&&parsed.unit==='mm'&&!/\bmm\b/i.test(String(rawText))&&!['Diş','Geçme'].includes(parsed.type))parsed.unit='in';
           if(parsed.type==='Açı') parsed.unit='°';
-          const explicitMarker=parsed.toleranceAmbiguous||Boolean(parsed.callout?.depth||parsed.callout?.secondaryDiameter||parsed.callout?.countersinkAngle)||/±|[+−-]\s*\d|\b(?:MIN|MAX|H\d+|h\d+)\b|[≤≥<>]/.test(String(rawText));
+          const explicitMarker=parsed.toleranceAmbiguous||Boolean(parsed.callout?.basic||parsed.callout?.reference||parsed.callout?.depth||parsed.callout?.secondaryDiameter||parsed.callout?.countersinkAngle)||/±|[+−-]\s*\d|\b(?:MIN|MAX|H\d+|h\d+)\b|[≤≥<>]/.test(String(rawText));
           if(parsed.type==='GD&T') {
             parsed.nominalValue='';
             if(parsed.toleranceExplicit && isFiniteTechnicalNumber(parsed.upperTolerance)) {
@@ -6781,14 +6861,15 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             } else if(angleClass) parsed.parseWarnings.push('Açı genel toleransı için kısa kenar uzunluğu gerekli.');
           }
           const custom = state.generalTolerance;
-          if (generalToleranceStandard === "CUSTOM" && !explicitMarker && custom.unit === parsed.unit && !parsed.toleranceExplicit && !parsed.toleranceStandard && !parsed.fitClass && !parsed.threadClass && ["Uzunluk", "Ölçü", "Çap", "Yarıçap", "Pah"].includes(parsed.type) && isFiniteTechnicalNumber(parsed.nominalValue) && (isFiniteTechnicalNumber(custom.lower) || isFiniteTechnicalNumber(custom.upper))) {
+          if (!explicitMarker && custom?.standard===generalToleranceStandard && window.ASMachRequirements?.applyDrawingTolerance) Object.assign(parsed,window.ASMachRequirements.applyDrawingTolerance(parsed,rawText,custom));
+          if ((generalToleranceStandard === "CUSTOM" || /^ASME Y14\.5-/.test(generalToleranceStandard)) && (!/^ASME/.test(generalToleranceStandard) || (custom.standard === generalToleranceStandard && isFiniteTechnicalNumber(custom.lower) && isFiniteTechnicalNumber(custom.upper) && Number(custom.lower) <= Number(custom.upper))) && !explicitMarker && custom.unit === parsed.unit && !parsed.toleranceExplicit && !parsed.toleranceStandard && !parsed.fitClass && !parsed.threadClass && ["Uzunluk", "Ölçü", "Çap", "Yarıçap", "Pah"].includes(parsed.type) && isFiniteTechnicalNumber(parsed.nominalValue) && (isFiniteTechnicalNumber(custom.lower) || isFiniteTechnicalNumber(custom.upper))) {
             parsed.lowerTolerance = isFiniteTechnicalNumber(custom.lower) ? String(custom.lower) : "0";
             parsed.upperTolerance = isFiniteTechnicalNumber(custom.upper) ? String(custom.upper) : "0";
             parsed.lowerLimit = formatTechnicalNumber(Number(parsed.nominalValue) + Number(parsed.lowerTolerance));
             parsed.upperLimit = formatTechnicalNumber(Number(parsed.nominalValue) + Number(parsed.upperTolerance));
-            parsed.toleranceStandard = "Kullanıcı genel toleransı";
+            parsed.toleranceStandard = /^ASME Y14\.5-/.test(generalToleranceStandard) ? `${generalToleranceStandard} · çizimde belirtilen sapmalar` : "Kullanıcı genel toleransı";
           }
-          return parsed;
+          return window.ASMachRequirements?.measurementEvidence ? window.ASMachRequirements.measurementEvidence(parsed,rawText,{standard:generalToleranceStandard}) : parsed;
         }
 
         function recalculateAnnotationLimits(item) {
@@ -7016,6 +7097,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
               : "",
             threadPitch: threadMatch?.[2] || (inchThreadMatch ? `${inchThreadMatch[2]} TPI` : ""),
             threadClass: threadMatch?.[3] || inchThreadMatch?.[4] || "",
+            threadStandard: threadMatch ? (threadMatch[3] ? "ISO 261 / ISO 965-1" : "ISO 261") : inchThreadMatch ? "ASME B1.1" : "",
             gdtSubtype,
           };
         }
@@ -7259,13 +7341,14 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             const area=points.reduce((s,p,i)=>s+p.x*points[(i+1)%4].y-p.y*points[(i+1)%4].x,0);
             if(area>1e-12){
               const left=Math.min(...points.map(p=>p.x)),top=Math.min(...points.map(p=>p.y));
-              return{x:left,y:top,w:Math.max(...points.map(p=>p.x))-left,h:Math.max(...points.map(p=>p.y))-top,points,rotation:clamp(Number(value.rotation)||0,-180,180)};
+              return{x:left,y:top,w:Math.max(...points.map(p=>p.x))-left,h:Math.max(...points.map(p=>p.y))-top,points,rotation:clamp(Number(value.rotation)||0,-180,180),...(value.angleLocked?{angleLocked:true}:{})};
             }
           }
           return w > 0 && h > 0 ? { x, y, w, h } : null;
         }
 
         function normalizeAnnotation(input) {
+          input = window.ASMachRequirements?.repairAutoRadius?.(input, text => parseTechnicalRequirement(text, state.generalTolerance?.standard || '')) || input;
           const inspectionMethod = normalizeInspectionMethod(input.inspectionMethod);
           const fallbackStyle = methodStyle(inspectionMethod);
           const legacySize = [18, 23, 29].includes(Number(input.size)) && input.opacity == null;
@@ -7320,6 +7403,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             fitClass: String(input.fitClass || ""),
             threadPitch: String(input.threadPitch || ""),
             threadClass: String(input.threadClass || ""),
+            threadStandard: String(input.threadStandard || (type === 'Diş' && /^(?:ISO\s+(?:261|965|2902|2903|7-1|228-1)|ASME\s+B1\.(?:1|20\.1|20\.3))/i.test(String(input.toleranceStandard || '')) ? input.toleranceStandard : "")),
             gdtSubtype: String(input.gdtSubtype || ""),
             sheetNo: Math.max(1, Number(input.sheetNo || input.page) || 1),
             zone: String(input.zone || ""),
@@ -7336,6 +7420,7 @@ const item = normalizeAnnotation({ requirementMode: options.type==='Not'?'manual
             lowerInclusive: input.lowerInclusive !== false,
             upperInclusive: input.upperInclusive !== false,
             parseWarnings: Array.isArray(input.parseWarnings) ? input.parseWarnings.map(String) : [],
+            measurementEvidence: input.type!=='GD&T' && input.measurementEvidence?.version===1 ? window.ASMachRequirements.measurementEvidence(input,input.ocrText||input.measurementEvidence.rawText,{standard:input.measurementEvidence.standard}).measurementEvidence : undefined,
             result: String(input.result ?? ""),
             resultStatus: String(input.resultStatus || "pending"),
             nonconformanceNo: String(input.nonconformanceNo || ""),

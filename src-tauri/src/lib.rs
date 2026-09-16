@@ -6,6 +6,7 @@ use tauri::{Emitter, Manager, State};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_autostart::ManagerExt as AutostartExt;
 pub mod licensing;
+mod updater;
 mod tpm;
 
 type Result<T> = std::result::Result<T, String>;
@@ -55,7 +56,7 @@ async fn desktop_bootstrap(app: tauri::AppHandle, state: State<'_, DesktopState>
     let db = state.database.lock().map_err(err)?;
     let mut query = db.prepare("SELECT key,value FROM preferences").map_err(err)?;
     let preferences = query.query_map([], |row| Ok((row.get::<_,String>(0)?, row.get::<_,String>(1)?))).map_err(err)?.collect::<std::result::Result<HashMap<_,_>,_>>().map_err(err)?;
-    Ok(Bootstrap {preferences, data_directory: app.path().app_data_dir().map_err(err)?.display().to_string(), version: app.package_info().version.to_string(), autostart: app.autolaunch().is_enabled().map_err(err)?, updater_configured: updater_config().is_some()})
+    Ok(Bootstrap {preferences, data_directory: app.path().app_data_dir().map_err(err)?.display().to_string(), version: app.package_info().version.to_string(), autostart: app.autolaunch().is_enabled().map_err(err)?, updater_configured: updater::configured()})
 }
 #[tauri::command]
 async fn preference_set(state: State<'_, DesktopState>, key: String, value: Option<String>) -> Result<()> {
@@ -281,34 +282,19 @@ async fn native_template_editor(app: tauri::AppHandle, template_id: Option<Strin
     }
     #[cfg(not(windows))] {let _=(path,fields);Err("Excel şablon editörü Windows gerektirir".into())}
 }
-#[derive(serde::Deserialize)]
-#[serde(rename_all="camelCase")]
-struct UpdaterConfig {url:String}
-fn updater_config() -> Option<String> {
-    let fallback:UpdaterConfig=serde_json::from_str(include_str!("../updater-config.json")).ok()?;
-    let url=option_env!("ASMACH_VERSION_URL").unwrap_or(&fallback.url).to_string();
-    if !url.starts_with("https://"){None}else{Some(url)}
-}
-#[derive(serde::Deserialize)]
-struct VersionResponse {version:String}
 #[tauri::command]
-async fn check_update(app: tauri::AppHandle) -> Result<Option<String>> {
-    let template=updater_config().ok_or("Sürüm kontrol adresi yapılandırılmadı.")?;
-    let url=template.replace("{{target}}",std::env::consts::OS).replace("{{arch}}",std::env::consts::ARCH).replace("{{current_version}}",&app.package_info().version.to_string());
-    let response=reqwest::Client::new().get(url).send().await.map_err(err)?;
-    if response.status()==reqwest::StatusCode::NO_CONTENT{return Ok(None)}
-    if !response.status().is_success(){return Err(format!("Sürüm bilgisi alınamadı ({})",response.status()))}
-    Ok(Some(response.json::<VersionResponse>().await.map_err(err)?.version))
-}
+async fn check_update(app: tauri::AppHandle) -> Result<Option<updater::UpdateInfo>> {updater::check(&app.package_info().version.to_string()).await}
+#[tauri::command]
+async fn install_update(app:tauri::AppHandle,state:State<'_,DesktopState>,version:String)->Result<()>{let installer=updater::download_and_stage(&app,&version).await?;updater::launch_after_exit(&installer)?;state.allow_close.store(true,Ordering::SeqCst);app.exit(0);Ok(())}
 struct StartupWindow {size:tauri::PhysicalSize<u32>,position:tauri::PhysicalPosition<i32>,maximized:bool,fullscreen:bool,finished:AtomicBool}
 #[tauri::command]
 fn license_window_stage(app:tauri::AppHandle,stage:String)->Result<()> {
     let window=app.get_webview_window("main").ok_or("Pencere bulunamadı")?;let saved=app.state::<StartupWindow>();
     if saved.finished.load(Ordering::SeqCst){return Ok(())}
     match stage.as_str(){
-      "checking"=>{window.show().map_err(err)?;},
-      "entry"=>{window.set_size(tauri::LogicalSize::new(680.,780.)).map_err(err)?;window.center().map_err(err)?;window.show().map_err(err)?;},
-      "ready"=>{licensing::require(&app)?;window.set_resizable(true).map_err(err)?;window.set_min_size(Some(tauri::LogicalSize::new(1000.,700.))).map_err(err)?;window.set_size(saved.size).map_err(err)?;window.set_position(saved.position).map_err(err)?;if saved.maximized||!saved.fullscreen{window.maximize().map_err(err)?;}if saved.fullscreen{window.set_fullscreen(true).map_err(err)?;}window.set_title("ASMach Inspection").map_err(err)?;saved.finished.store(true,Ordering::SeqCst);},
+      "checking"=>{},
+      "entry"=>{window.set_resizable(true).map_err(err)?;window.set_min_size(Some(tauri::LogicalSize::new(640.,600.))).map_err(err)?;window.set_size(tauri::LogicalSize::new(760.,720.)).map_err(err)?;window.center().map_err(err)?;window.set_title("ASMach · Lisans Etkinleştirme").map_err(err)?;window.show().map_err(err)?;window.set_focus().map_err(err)?;},
+      "ready"=>{licensing::require(&app)?;window.set_resizable(true).map_err(err)?;window.set_min_size(Some(tauri::LogicalSize::new(1000.,700.))).map_err(err)?;window.set_size(saved.size).map_err(err)?;window.set_position(saved.position).map_err(err)?;if saved.maximized{window.maximize().map_err(err)?;}if saved.fullscreen{window.set_fullscreen(true).map_err(err)?;}window.set_title("ASMach Inspection").map_err(err)?;window.show().map_err(err)?;window.set_focus().map_err(err)?;saved.finished.store(true,Ordering::SeqCst);},
       _=>return Err("Geçersiz açılış aşaması".into())
     }Ok(())
 }
@@ -321,7 +307,7 @@ pub fn run() {
           if let Some(window)=app.get_webview_window("main") {
               if let Some(icon)=app.default_window_icon() { window.set_icon(icon.clone())?; }
               app.manage(StartupWindow{size:window.inner_size()?,position:window.outer_position()?,maximized:window.is_maximized()?,fullscreen:window.is_fullscreen()?,finished:AtomicBool::new(false)});
-              window.set_fullscreen(false)?;window.unmaximize()?;window.set_min_size(Some(tauri::LogicalSize::new(360.,220.)))?;window.set_size(tauri::LogicalSize::new(400.,250.))?;window.set_resizable(false)?;window.center()?;window.set_title("ASMach · Lisans kontrolü")?;
+              window.set_fullscreen(false)?;window.unmaximize()?;
           }
           let dir=app.path().app_data_dir()?;fs::create_dir_all(&dir)?;
           licensing::setup(app.handle()).map_err(std::io::Error::other)?;
@@ -336,7 +322,7 @@ pub fn run() {
           Ok(())
       })
       .on_window_event(|window,event|{if let tauri::WindowEvent::CloseRequested{api,..}=event {if !window.state::<DesktopState>().allow_close.load(Ordering::SeqCst){api.prevent_close();let _=window.emit("desktop-close-request",());}}})
-      .invoke_handler(tauri::generate_handler![license_window_stage,licensing::license_activate,licensing::license_offline_activate,licensing::license_request_create,licensing::license_discover,licensing::license_tpm_identity,licensing::license_status,licensing::license_import,licensing::license_check_online,desktop_bootstrap,preference_set,recovery_get,recovery_put,open_file,choose_save_target,write_target,choose_output_directory,set_autostart,confirm_close,close_application,hide_to_tray,native_pdf,native_excel_open,native_excel_preview,native_template_list,native_template_import,native_template_store,native_template_read,native_template_delete,native_template_editor,check_update])
+      .invoke_handler(tauri::generate_handler![license_window_stage,licensing::license_activate,licensing::license_offline_activate,licensing::license_request_create,licensing::license_discover,licensing::license_tpm_identity,licensing::license_status,licensing::license_import,licensing::license_check_online,desktop_bootstrap,preference_set,recovery_get,recovery_put,open_file,choose_save_target,write_target,choose_output_directory,set_autostart,confirm_close,close_application,hide_to_tray,native_pdf,native_excel_open,native_excel_preview,native_template_list,native_template_import,native_template_store,native_template_read,native_template_delete,native_template_editor,check_update,install_update])
       .run(tauri::generate_context!()).expect("ASMach masaüstü uygulaması başlatılamadı");
 }
 

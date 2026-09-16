@@ -4,13 +4,29 @@
   function reconstruct(words,{width=1,height=1,ocr=false,details=false}={}){
     if(!words?.length)return '';
     const clean=s=>root.ASMachRequirements.normalize(s);
+    const numericToken=/^(?:S?Ø|SR|R)?[±+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:°)?$/;
+    const expandNumericSymbols=!root.ASMachRequirements.detectGdt?.(words.map(word=>word.text||'').join(' '));
+    // A word's normalized text cannot explain whether a large space was tracking
+    // or a second measurement. Use the OCR's existing character boxes only when
+    // they account for the whole numeric word; never manufacture missing glyphs.
+    let symbolGeometryWords=0;
+    const source=words.flatMap((word,sourceId)=>{
+      const sourceText=clean(word.text),symbols=word.symbols||[];
+      const eligible=expandNumericSymbols&&numericToken.test(sourceText)&&symbols.length>1&&symbols.every(symbol=>{
+        const text=clean(symbol.text);
+        return /^[ØR\d.,+±\-°]$/.test(text)&&[symbol.x,symbol.y,symbol.w,symbol.h].every(Number.isFinite)&&symbol.w>0&&symbol.h>0&&
+          symbol.x>=word.x-word.w*.15&&symbol.y>=word.y-word.h*.25&&symbol.x+symbol.w<=word.x+word.w*1.15&&symbol.y+symbol.h<=word.y+word.h*1.25;
+      })&&clean(symbols.map(symbol=>symbol.text).join(''))===sourceText;
+      if(eligible){symbolGeometryWords++;return symbols.map(symbol=>({...symbol,angle:word.angle,sourceId,sourceText}));}
+      return [{...word,sourceId,sourceText}];
+    });
     const readingAngle=words.filter(w=>/\d/.test(w.text)).sort((a,b)=>b.text.length-a.text.length)[0]?.angle||0;
-    const boxes=words.filter(w=>w.text?.trim()).map(w=>{
+    const boxes=source.filter(w=>w.text?.trim()).map(w=>{
       const wordAngle=/^(?:Ø|R|SR)$/.test(clean(w.text))?readingAngle:w.angle||0;
       const angle=ocr?-wordAngle*Math.PI/180:wordAngle,c=Math.cos(angle),s=Math.sin(angle);
       const corners=[[w.x,w.y],[w.x+w.w,w.y],[w.x,w.y+w.h],[w.x+w.w,w.y+w.h]].map(([x,y])=>[c*x*width+s*y*height,-s*x*width+c*y*height]);
       const xs=corners.map(p=>p[0]),ys=corners.map(p=>p[1]);
-      return {text:clean(w.text),x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};
+      return {text:clean(w.text),sourceId:w.sourceId,sourceText:w.sourceText,x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};
     }).filter(w=>w.h>0&&w.w>0);
     const lines=[],smallMarks=[];
     for(const w of boxes.sort((a,b)=>b.h-a.h||a.x-b.x)){
@@ -23,6 +39,7 @@
       if(!line){line={words:[],cy,h:w.h};lines.push(line);}line.words.push(w);
     }
     let ambiguousSpacing=boxes.some(w=>/\d[ \t]+\d/.test(w.text));
+    const ambiguityReasons=new Set(ambiguousSpacing?['unresolved_word_spacing']:[]);
     for(const w of smallMarks){
       const cy=w.y+w.h/2,decimal=/^[.,]$/.test(w.text),degree=w.text==='°';
       const eligible=lines.map(line=>{
@@ -35,7 +52,7 @@
       }).filter(v=>v.vertical&&v.dx<v.line.h*1.3&&v.line.h>=w.h*.75);
       eligible.sort((a,b)=>a.score-b.score);
       if(eligible.length&&(!eligible[1]||eligible[1].score-eligible[0].score>.12))eligible[0].line.words.push(w);
-      else {lines.push({words:[w],cy,h:w.h});if(decimal)ambiguousSpacing=true;}
+      else {lines.push({words:[w],cy,h:w.h});ambiguousSpacing=true;ambiguityReasons.add(eligible.length?'ambiguous_mark_row':'unattached_mark');}
     }
     for(const l of lines){
       const sorted=l.words.sort((a,b)=>a.x-b.x);let value='';
@@ -63,11 +80,15 @@
         const prior=sorted[i-1],gap=prior?w.x-prior.x-prior.w:0;
         const glyphs=prior&&/^(?:SR|SØ|[RØ⌀Φ\d.,+\-±°]+)$/.test(prior.text)&&/^(?:SR|SØ|[RØ⌀Φ\d.,+\-±°]+)$/.test(w.text)&&(prior.text.length===1||w.text.length===1);
         const tracking=prior&&runAt.has(w)&&runAt.get(prior)?.run===runAt.get(w).run?runAt.get(w).limit:l.h*.7;
-        const completeNumberBoundary=prior&&prior.text.length>1&&/\d$/.test(prior.text)&&/^\d/.test(w.text);
+        // Keep an OCR/PDF numeric word separate from a neighboring numeric word,
+        // even after expanding the first word into its character boxes. Joining
+        // "5" with "12" is no safer than joining "12" with "5".
+        const completeNumberBoundary=prior&&prior.sourceId!==w.sourceId&&/\d$/.test(prior.text)&&/^\d/.test(w.text)&&
+          ((prior.sourceText.match(/\d/g)||[]).length>1||(w.sourceText.match(/\d/g)||[]).length>1);
         const glue=glyphs&&!completeNumberBoundary&&gap<Math.max(tracking,.001)&&!(/^[+±-]/.test(w.text)&&/\d$/.test(prior.text));
-        if(prior&&!glue&&/[\d.,]$/.test(prior.text)&&/^[\d.,]/.test(w.text))ambiguousSpacing=true;
+        if(prior&&!glue&&/[\d.,]$/.test(prior.text)&&/^[\d.,]/.test(w.text)){ambiguousSpacing=true;ambiguityReasons.add(completeNumberBoundary?'separate_numeric_words':'separated_numeric_glyphs');}
         value+=(value&&!glue?' ':'')+w.text;
-      });l.text=clean(value);
+      });l.geometryText=value;l.text=clean(value);
     }
     const left=l=>Math.min(...l.words.map(w=>w.x)),right=l=>Math.max(...l.words.map(w=>w.x+w.w));
     const number='(?:\\d+(?:\\.\\d+)?|\\.\\d+)',unit='(?:mm|cm|µm|μm|µin|nm|in|m|°)';
@@ -79,7 +100,8 @@
     let nominal=null;
     const finish=(text,structured=false,extra={})=>{
       const missingDigits=Math.max(0,boxes.reduce((sum,w)=>sum+digits(w.text),0)-digits(text));
-      return details?{text,structured:structured&&!ambiguousSpacing,missingDigits,nominal:nominal?.text||'',...extra,...(ambiguousSpacing?{ambiguousSpacing:true}:{})}:text;
+      return details?{text,structured:structured&&!ambiguousSpacing,missingDigits,nominal:nominal?.text||'',...extra,
+        ...(symbolGeometryWords?{symbolGeometryWords}:{}),...(ambiguousSpacing?{ambiguousSpacing:true,ambiguityReasons:[...ambiguityReasons],geometryText:lines.slice().sort((a,b)=>a.cy-b.cy).map(l=>l.geometryText||l.text).join('\n')}:{})}:text;
     };
     // Equal-height, aligned unsigned rows are limit dimensions, not deviations.
     // Require geometry and retain all other tokens; never join unrelated values.
@@ -125,7 +147,9 @@
       if(supported){
         if(deviations.length===2&&!deviations.some(l=>l.text.startsWith('±'))&&deviations.some(l=>/^[+-]/.test(l.text))){
           const ordered=deviations.sort((a,b)=>a.cy-b.cy);
-          if(ordered[1].cy-ordered[0].cy>Math.min(...ordered.map(l=>l.h))*.5)return finish(clean(`${core} (${ordered.map(l=>l.text).join('/')}) ${suffix}`),true);
+          const orderedValues=ordered.map(line=>Number(line.text.replace(/°$/,'')));
+          if(orderedValues[0]<orderedValues[1]){ambiguousSpacing=true;ambiguityReasons.add('inverted_deviation_rows');}
+          else if(ordered[1].cy-ordered[0].cy>Math.min(...ordered.map(l=>l.h))*.5)return finish(clean(`${core} (${ordered.map(l=>l.text).join('/')}) ${suffix}`),true);
         }
         if(deviations.length===1&&/^[±+-]/.test(deviations[0].text))return finish(clean(`${core} ${deviations[0].text} ${suffix}`),true);
         if(!deviations.length&&(prefixes.length||suffixes.length))return finish(clean(`${core} ${suffix}`),true);

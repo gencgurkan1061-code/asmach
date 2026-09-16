@@ -26,10 +26,11 @@
  }
  // Partition connected ink into separate reading rows without altering source pixels.
  // Thin detached drawing rules are excluded from crop bounds, never erased in-place.
- function measurementInkRows(canvas){
+ function measurementInkRows(canvas,threshold=180){
   const w=canvas.width,h=canvas.height;if(w*h>2000000)return [];
   const pixels=canvas.getContext('2d').getImageData(0,0,w,h).data,seen=new Uint8Array(w*h),parts=[];
-  const dark=i=>pixels[i*4+3]>128&&pixels[i*4]<180;
+  const cutoff=Math.max(1,Math.min(250,Number(threshold)||180));
+  const dark=i=>pixels[i*4+3]>128&&pixels[i*4]<cutoff;
   for(let i=0;i<w*h;i++){
    if(seen[i]||!dark(i))continue;const todo=[i];seen[i]=1;let x0=w,x1=0,y0=h,y1=0;
    for(let n=0;n<todo.length;n++){const j=todo[n],x=j%w,y=Math.floor(j/w);x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);
@@ -97,7 +98,20 @@
    out.push({text:'±',x:Math.min(plus.x,minus.x),y:plus.y,w:Math.max(plus.x+plus.w,minus.x+minus.w)-Math.min(plus.x,minus.x),h:minus.y+minus.h-plus.y});
   }}return out;
  }
- function compare(candidates,best){const key=text=>String(text||'').replace(/\s/g,'').replace(/,/g,'.');const distinct=new Set(candidates.filter(c=>c.text&&c.confidence>=40).map(c=>key(c.text)));return distinct.size>1&&!!best.text;}
+ function semanticReadings(candidates,best){
+  const assess=root.ASMachRequirements?.assessReading;if(!best?.text)return[];
+  const floor=Math.max(55,(Number(best.confidence)||0)-18);
+  const meaning=text=>{const assessed=assess?.(text);if(assessed?.valid)return assessed;const normalized=String(text||'').replace(/,/g,'.').replace(/\s+/g,'').replace(/(?:\d+(?:\.\d+)?|\.\d+)/g,value=>String(Number(value)));return{valid:!!normalized,signature:'text:'+normalized};};
+  return candidates.filter(c=>c?.text&&Number(c.confidence)>=floor).map(c=>({candidate:c,meaning:meaning(c.text)})).filter(x=>x.meaning.valid);
+ }
+ function bestSignature(best,readings){return readings.find(x=>x.candidate===best)?.meaning.signature||readings.find(x=>String(x.candidate.text)===String(best?.text))?.meaning.signature||'';}
+ function agrees(candidates,best){const readings=semanticReadings(candidates,best),signature=bestSignature(best,readings);if(!signature||readings.length<2)return false;const votes=new Map();for(const {meaning:next}of readings)votes.set(next.signature,(votes.get(next.signature)||0)+1);const own=votes.get(signature)||0,other=Math.max(0,...[...votes].filter(([key])=>key!==signature).map(([,count])=>count));return own>=2&&own>other;}
+ function compare(candidates,best){
+  if(!best?.text||agrees(candidates,best))return false;
+  const readings=semanticReadings(candidates,best),signature=bestSignature(best,readings);
+  if(signature&&readings.length){const votes=new Map();for(const {meaning:next}of readings)votes.set(next.signature,(votes.get(next.signature)||0)+1);const own=votes.get(signature)||0,other=Math.max(0,...[...votes].filter(([key])=>key!==signature).map(([,count])=>count));return other>=Math.max(2,own);}
+  const key=text=>String(text||'').replace(/\s/g,'').replace(/,/g,'.'),floor=Math.max(55,(Number(best.confidence)||0)-18),votes=new Map();for(const candidate of candidates.filter(c=>c?.text&&Number(c.confidence)>=floor)){const value=key(candidate.text);votes.set(value,(votes.get(value)||0)+1);}const own=votes.get(key(best.text))||0,other=Math.max(0,...[...votes].filter(([value])=>value!==key(best.text)).map(([,count])=>count));return other>=Math.max(2,own);
+ }
  function report(result){const note=document.getElementById('ocrEnhancementStatus');if(note)note.textContent=result.needsReview?'Okumalar farklı: nominal değeri, işaretleri ve toleransları kontrol edin.':'Son okuma tamamlandı. Sonucu kaynak görüntüyle kontrol edin.';}
  function review(result){return new Promise(resolve=>{const dialog=document.createElement('dialog');dialog.className='oe-review';const heading=document.createElement('h3'),hint=document.createElement('p'),list=document.createElement('div'),footer=document.createElement('footer'),cancel=document.createElement('button'),accept=document.createElement('button');heading.textContent='OCR sonucunu kontrol edin';hint.textContent='Mevcut bilgiler henüz değiştirilmedi. Kaynak görüntüyle karşılaştırıp bir okuma seçin veya vazgeçin.';cancel.textContent='Mevcut bilgiyi koru';accept.textContent='Seçili okumayı kullan';accept.disabled=true;const entries=[result,...(result.alternatives||[])].filter((r,i,a)=>r.text&&a.findIndex(q=>q.text===r.text)===i);let selected=null,settled=false;for(const entry of entries){const label=document.createElement('label'),radio=document.createElement('input'),text=document.createElement('span');radio.type='radio';radio.name='ocr-reading';text.textContent=entry.text;label.append(radio,text);list.append(label);radio.onchange=()=>{selected=entry;accept.disabled=false;};}cancel.onclick=()=>dialog.close();accept.onclick=()=>{settled=true;resolve({...selected,needsReview:false,reviewConfirmed:true});dialog.close();};dialog.addEventListener('close',()=>{if(!settled)resolve(null);dialog.remove();});footer.append(cancel,accept);dialog.append(heading,hint,list,footer);document.body.append(dialog);dialog.showModal();});}
  function diagnostic(image,result){const c=document.createElement('canvas'),w=image.naturalWidth||image.width,h=image.naturalHeight||image.height,k=Math.min(1,1600/Math.max(w,h));c.width=w*k;c.height=h*k;const ctx=c.getContext('2d');ctx.drawImage(image,0,0,c.width,c.height);ctx.lineWidth=Math.max(1,c.width/400);for(const word of result.words||[]){ctx.strokeStyle=/^[+−-]/.test(word.text)?'#b44a08':/^0(?:\.0+)?$/.test(word.text)?'#7958b6':'#008b9b';ctx.strokeRect(word.x*c.width,word.y*c.height,word.w*c.width,word.h*c.height);}return c.toDataURL();}
@@ -116,5 +130,5 @@
  const reviewCss=document.createElement('style');reviewCss.textContent='.oe-review{width:560px;max-width:92vw;max-height:80vh;overflow:auto;padding:18px;border:1px solid #afc8d5;border-radius:8px;font:13px Segoe UI;color:#20495e}.oe-review::backdrop{background:#18364366}.oe-review label{display:flex;gap:8px;padding:10px;margin:5px 0;border:1px solid #d0dfe7;border-radius:4px;white-space:pre-wrap}.oe-review footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.oe-review button,#ocrEnhancementPreview>button{padding:7px 12px;border:1px solid #adc9d6;background:#edf6f8;color:#164b61;border-radius:4px;cursor:pointer}.oe-review button:disabled{opacity:.5}.oe-images pre{white-space:pre-wrap;font:14px Segoe UI;padding:8px;background:white;border-top:1px solid #cbdce5;overflow-wrap:anywhere}';document.head.append(reviewCss);
  const directCss=document.createElement('style');directCss.textContent='#ocrEnhancementControls>label{display:none}#ocrEnhancementControls small{display:none}.wf-reading-modes,.wf-reading-targets{padding:3px 5px;gap:4px}.wf-reading-modes button,.wf-reading-targets button,.oe-use-reading,.oe-region-actions button{padding:4px 7px;border:1px solid #b7cedb;border-radius:4px;background:white;color:#194b62;font:11px Segoe UI;cursor:pointer}.wf-reading-modes [aria-pressed=true],.oe-use-reading[aria-pressed=true]{background:#dbf5f7;border-color:#0095a7;color:#006578}.oe-use-reading{margin-top:8px}.oe-region-actions{display:flex;gap:6px;margin-top:8px}.wf-source-draft textarea{resize:vertical;min-height:40px;font:12px Segoe UI;width:100%;box-sizing:border-box}';document.head.append(directCss);
  const compactCss=document.createElement('style');compactCss.textContent='#ocrEnhancementControls{display:none!important}';document.head.append(compactCss);
- root.ASMachOcrEnhancement={mode,setMode,decorateTarget,process,compare,report,preview,review,regions,measurementRegions,measurementInkRows,spacingVariant,toleranceSigns,diagnostic};
+ root.ASMachOcrEnhancement={mode,setMode,decorateTarget,process,compare,agrees,report,preview,review,regions,measurementRegions,measurementInkRows,spacingVariant,toleranceSigns,diagnostic};
 })(window);

@@ -1,0 +1,11 @@
+/* Compact manager: preserve readable controls, remove decorative empty space. */
+body{font-size:13px}header{height:62px;padding:8px 16px}header .brand{width:34px;height:34px}header p,.nav-caption,.nav-footer{display:none}
+.manager-nav{width:164px;top:62px;padding:10px 7px}.manager-nav button{padding:9px 10px;margin:0;font-size:12px}
+main{margin-left:164px;padding:12px;gap:10px}.heading{padding:10px 12px}.heading h2{font-size:15px}.section-heading>p{margin:4px 0 0}
+.overview-cards{gap:7px;padding:10px}.overview-card{padding:11px}.overview-card strong{font-size:22px;margin-bottom:4px}.attention-list{padding:0 12px 12px}.attention-row{padding:8px 0;gap:10px}
+.content-pad{padding:12px;line-height:1.5}.customer-list,.request-list{padding:10px;gap:8px}.customer-card,.request-card{padding:11px;border-radius:5px}.request-card code{margin:6px 0;padding:5px}
+.records td{padding:7px 9px}.records th{padding:8px 9px}.pager,.bulk-bar{padding:8px 12px}.tableWrap{min-height:150px;max-height:calc(100vh - 300px)}
+button{padding:7px 10px}input,select{min-height:32px}label{margin-bottom:9px}.backup-card{margin-top:12px;padding-top:12px}.backup-card input{margin-bottom:6px}
+#userDetail .detail-body{padding:12px}.customer-tab-panel{padding:12px}.customer-license-item{gap:6px}.customer-license-card{padding:9px}
+.release-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px}.release-form label{margin:0;display:flex;flex-direction:column;gap:4px}.release-form .wide{grid-column:1/-1}.release-form textarea{min-height:54px}.release-form input[type=file]{border:1px dashed #92b9c8;padding:12px;background:#f6fafc}.release-list{padding:0 12px 12px}.release-item{border-top:1px solid #d5e3e9;padding:10px 0}.release-item p{margin:4px 0;overflow-wrap:anywhere}.release-item .row-actions{flex-wrap:wrap}.release-config{margin:0 12px 12px;border-top:1px solid #d5e3e9;padding-top:8px}.release-config label{display:block;margin-top:8px}.release-config input{width:100%}.release-status{padding:8px 12px;white-space:pre-line}.release-item small{color:#527080}
+@media(max-width:760px){header{height:auto}.manager-nav{position:static;width:auto}main{margin-left:0;padding:8px}.release-form{grid-template-columns:1fr 1fr}.release-form .wide{grid-column:1/-1}.tableWrap{max-height:60vh}.heading{padding:8px}.customer-list{grid-template-columns:1fr}}

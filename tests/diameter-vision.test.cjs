@@ -22,6 +22,14 @@ test('Visual evidence repairs a confused prefix and preserves numeric and tolera
  for(const text of ['027.3','27.3 ±0.05','8 27.3'])assert.equal(api.recover({text,angle:0},evidence).text,text);
  assert.equal(api.recover({text:'O27.3',angle:0},{diameter:false}).text,'O27.3');assert.equal(api.recover({text:'O27.3',angle:90},evidence).text,'O27.3');
 });
+test('Visual evidence unifies OCR passes that completely omit the diameter glyph',()=>{
+ const api=c.window.ASMachDiameterVision,evidence=api.detect(fixture('phi',0),'27.3'),b=evidence.box;
+ const reading={text:'27.3',angle:0,words:[{text:'27.3',confidence:96,x:b.x+b.w+b.h*.35,y:b.y,w:b.h*1.8,h:b.h}]};
+ const fixed=api.recover(reading,evidence);
+ assert.equal(fixed.text,'Ø27.3');assert.equal(fixed.rawText,'27.3');assert.equal(fixed.symbolRecovery,'Çap simgesi kaynak görüntüden doğrulandı');
+ assert.equal(api.recover({...reading,words:[{...reading.words[0],x:b.x+b.w+b.h*3}]},evidence).text,'27.3','distant symbols are never borrowed');
+ assert.equal(api.recover({...reading,text:'82',words:[{...reading.words[0],text:'82'}]},evidence).text,'Ø82','visual recovery never changes the recognized digits');
+});
 test('User screenshot regression: vertical graphical diameter omitted from PDF text',async t=>{
   const path='C:/Users/gencg/AppData/Local/Temp/codex-clipboard-377aa3b1-b9a1-42fd-b3af-69c3c4205b8d.png';
   if(!fs.existsSync(path)){t.skip('Local diagnostic screenshot is no longer available');return;}

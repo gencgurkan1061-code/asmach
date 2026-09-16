@@ -143,6 +143,55 @@
     return TYPE_ALIASES[type] || (TYPES.includes(type) ? type : "Diğer");
   }
 
+  const MEASUREMENT_INTENTS = Object.freeze(["Uzunluk", "Çap", "Yarıçap", "Açı", "Pah", "Diş", "Geçme", "Limit ölçü", "Yüzey"]);
+  function normalizeMeasurementIntent(value) {
+    const text=String(value||'').trim();
+    if(!text)return '';
+    if(text==='Limit ölçü'||text==='limit')return 'Limit ölçü';
+    const normalized=normalizeType(text);
+    return MEASUREMENT_INTENTS.includes(normalized)?normalized:'';
+  }
+  function measurementIntentEvidence(rawText, expectedType, record={}) {
+    const expected=normalizeMeasurementIntent(expectedType),text=normalize(rawText),nominal=number(record.nominalValue)!==null;
+    if(!expected)return {expected:'',valid:true,strong:false};
+    const patterns={
+      'Çap':/[ØΦ⌀∅]|\b(?:DIA|DIAMETER|ÇAP)\b/i,
+      'Yarıçap':/(?:^|\s)(?:SR|R)\s*\d/i,
+      'Açı':/[°º˚′″]|\b(?:DEG|DERECE)\b/i,
+      'Pah':/(?:\bC\s*\d|\bPAH\b|\d\s*[x×]\s*\d\s*°)/i,
+      'Diş':/(?:^|\s)(?:M\s*\d|TR\s*\d|NPTF?|NPTR|NPSC|NPSM|NPSL|UNC|UNF|UNEF|UNJ|UNS|BSPP|BSPT|RC\s*\d|RP\s*\d|G\s*\d)/i,
+      'Geçme':/\d(?:\.\d+)?\s*(?:[A-HJ-NPR-Z]|[a-hj-npr-z])\s*\d(?:\s*\/\s*(?:[A-HJ-NPR-Z]|[a-hj-npr-z])\s*\d)?\b/,
+      'Limit ölçü':/\b(?:MIN|MAX)\b|(?:^|\s)[<>≤≥]\s*\d/i,
+      'Yüzey':/(?:\b(?:Ra|Rz|Rq|Rt|Rp|Rv|Rmax|Rzjis|Rsk|Rku|RSm|Sa|Sq|Sz|Sp|Sv|RMS|CLA)\s*\d|[⌯▽])/i,
+    };
+    const strong=expected==='Uzunluk'?nominal:Boolean(patterns[expected]?.test(text)||(expected==='Geçme'&&record.fitClass)||(expected==='Limit ölçü'&&record.limitDimension));
+    const conflicting=expected==='Çap'&&/(?:^|\s)R\s*\d/i.test(text)||expected==='Yarıçap'&&/[ØΦ⌀∅]/.test(text)||expected==='Uzunluk'&&/(?:^|\s)(?:M|R)\s*\d|[ØΦ⌀∅]|[°º˚]/i.test(text);
+    const simple=['Uzunluk','Çap','Yarıçap','Açı'].includes(expected);
+    return {expected,valid:!conflicting&&(simple?nominal:strong),strong};
+  }
+  function measurementIntentScore(rawText, expectedType, record) {
+    const evidence=measurementIntentEvidence(rawText,expectedType,record||parse(rawText));
+    if(!evidence.expected)return 0;
+    const actual=record?.type||parse(rawText).type;
+    if(evidence.expected==='Limit ölçü')return evidence.valid?55:-35;
+    return (actual===evidence.expected?48:0)+(evidence.strong?28:0)-(evidence.valid?0:42);
+  }
+  function applyMeasurementIntent(record, rawText, expectedType) {
+    const evidence=measurementIntentEvidence(rawText,expectedType,record),expected=evidence.expected;
+    if(!expected)return {...record,measurementIntent:'',measurementIntentValid:true};
+    const next={...record,measurementIntent:expected,measurementIntentValid:evidence.valid};
+    if(expected!=='Limit ölçü')next.type=expected;
+    if(expected==='Açı')next.unit='°';
+    if(['Uzunluk','Çap','Yarıçap','Açı','Pah'].includes(expected)){next.threadPitch='';next.threadClass='';next.threadStandard='';next.fitClass='';}
+    if(expected!=='GD&T'){next.gdtSubtype='';next.gdtFrame=null;next.datumRefs='';}
+    if(!evidence.valid){
+      const warning=`Seçilen “${expected}” ölçü türü OCR metniyle doğrulanamadı. Kaynak görüntüyü kontrol edin veya ölçü türünü Otomatik yapın.`;
+      next.parseWarnings=[...new Set([...(next.parseWarnings||[]),warning])];
+      next.ocrNeedsReview=true;next.ocrReviewReason=warning;
+    }
+    return next;
+  }
+
   function normalizeStatus(status) {
     const aliases = { TASLAK: "needs_review", KONTROL: "needs_review", ONAYLI: "approved", REDDEDILDI: "rejected", OLCULDU: "measured", UYGUN: "pass", UYGUN_DEGIL: "fail" };
     return aliases[status] || (STATUSES.some((item) => item.value === status) ? status : "needs_review");
@@ -390,6 +439,36 @@
     if(!label){result.nominalValue=result.lowerTolerance=result.upperTolerance=result.lowerLimit=result.upperLimit='';result.unit='';}
     return result;
   }
+  // Field states are evidence labels, not invented OCR confidence percentages.
+  function applyDrawingTolerance(record, rawText, profile = {}) {
+    if (!/^ASME Y14\.5-/.test(profile.standard || '') || record.toleranceExplicit || record.toleranceAmbiguous || record.fitClass || record.threadClass || record.gdtFrame || record.callout?.basic || record.callout?.reference || record.callout?.depth || record.callout?.secondaryDiameter || record.callout?.countersinkAngle) return record;
+    if (!['Uzunluk','Ölçü','Çap','Yarıçap','Açı'].includes(record.type) || number(record.nominalValue)===null) return record;
+    if (['lowerTolerance','upperTolerance','lowerLimit','upperLimit'].some(k=>number(record[k])!==null)) return record;
+    const angle=record.type==='Açı';
+    if (!angle && record.unit!==profile.unit) return record;
+    const text=normalize(rawText),match=text.match(/^(?:Ø|R)?\s*(\d+(?:\.\d+)?|\.\d+)\s*(?:mm|in|°)?$/i);
+    if (!match) return record;
+    const key=angle?'angle':String((match[1].split('.')[1]||'').length),value=profile.precisionRules?.[key];
+    if (value==null || String(value).trim()==='' || !Number.isFinite(Number(value)) || Number(value)<0) return record;
+    const tolerance=Number(value),nominal=number(record.nominalValue);
+    return {...record,lowerTolerance:decimal(-tolerance),upperTolerance:decimal(tolerance),lowerLimit:decimal(nominal-tolerance),upperLimit:decimal(nominal+tolerance),toleranceStandard:`${profile.standard} · çizim tablosu (${angle?'açı':'ondalık '+key})`};
+  }
+
+  function measurementEvidence(record, rawText, context = {}) {
+    if (record.type === 'GD&T' || record.gdtFrame) return record;
+    const manual = new Set(record.manualFields || []), fields = {};
+    for (const key of ['nominalValue','lowerTolerance','upperTolerance','lowerLimit','upperLimit','unit','threadPitch','threadClass','threadStandard','fitClass','specialDesignator']) {
+      const value = record[key];
+      let source = manual.has(key) ? 'manual' : 'parsed';
+      if (key === 'unit' && !/\b(?:mm|in|inch|cm|nm)\b|[µμ]|°|["″]/i.test(rawText || '') && !['Diş','Geçme','Açı'].includes(record.type)) source='drawing_default';
+      if (record.nominalSource === 'limit_midpoint' && ['nominalValue','lowerTolerance','upperTolerance'].includes(key)) source='calculated_from_limits';
+      if (!record.toleranceExplicit && record.toleranceStandard && ['lowerTolerance','upperTolerance','lowerLimit','upperLimit'].includes(key)) source='general_tolerance';
+      if (manual.has(key)) source='manual';
+      fields[key]={value:value??'',source,status:value==null||value===''?'missing':record.toleranceAmbiguous&&key!=='unit'?'review':'available'};
+    }
+    return {...record,measurementEvidence:{version:1,rawText:String(rawText??''),standard:String(context.standard||record.toleranceStandard||''),fields}};
+  }
+
   function parse(rawText, standard = "", legacyParse) {
     const limitPair=limitPairFromText(normalize(rawText));
     if(limitPair){
@@ -398,6 +477,10 @@
       result.requirement=generateRequirement(result)||'';result.requirementMode='auto';
       return result;
     }
+    // Rp is also a surface parameter. A fractional pipe designation carries
+    // explicit thread evidence; do not consume it as an unreadable Rp roughness.
+    const fractionalRp=/^\s*(?:\d+\s*[x×]\s*)?Rp\s*(?:\d+\s+)?\d+\s*\/\s*\d+/i.test(String(rawText));
+    if(fractionalRp){const thread=parseThreadCallout(rawText);if(thread)return thread;}
     const surfaceResult=parseSurface(normalize(rawText));
     if(surfaceResult){surfaceResult.surfaceTexture.source=String(rawText);return Object.assign(parse('', '', legacyParse),surfaceResult);}
     const angular=parseAngularCallout(normalize(rawText));
@@ -425,8 +508,84 @@
     }
     return result;
   }
+  const THREAD_FRACTION_RE='(?:\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+(?:[.,]\\d+)?)';
+  const NPT_TPI=Object.freeze({'0.0625':'27','0.125':'27','0.25':'18','0.375':'18','0.5':'14','0.75':'14','1':'11.5','1.25':'11.5','1.5':'11.5','2':'11.5','2.5':'8','3':'8','3.5':'8','4':'8','5':'8','6':'8'});
+  const BSP_TPI=Object.freeze({'0.0625':'28','0.125':'28','0.25':'19','0.375':'19','0.5':'14','0.75':'14','1':'11','1.25':'11','1.5':'11','2':'11','2.5':'11','3':'11','4':'11','5':'11','6':'11'});
+  function threadSize(value){
+    const source=String(value||'').trim().replace(',','.');
+    const fraction=source.match(/^(?:(\d+)\s+)?(\d+)\/(\d+)$/);
+    if(fraction&&Number(fraction[3])>0)return Number(fraction[1]||0)+Number(fraction[2])/Number(fraction[3]);
+    const number=Number(source);return Number.isFinite(number)&&number>0?number:null;
+  }
+  function threadRecord({size,unit='mm',pitch='',threadClass='',form='',standard='',quantity=1,warnings=[],hand=''}){
+    return {type:'Diş',nominalValue:decimal(size),unit,threadPitch:pitch,threadClass,threadStandard:standard,lowerTolerance:'',upperTolerance:'',lowerLimit:'',upperLimit:'',fitClass:'',gdtSubtype:'',datumRefs:'',gdtFrame:null,quantity:Number(quantity||1),evaluationMethod:'OK_NOT_OK',toleranceExplicit:false,toleranceStandard:standard,parseWarnings:warnings,callout:{threadForm:form,threadHand:hand}};
+  }
+  function plainRadius(rawText){
+    // A bare R plus an integer/decimal is a radius, not evidence of ISO 7-1.
+    // Keep slashes and suffixes: R1/8, Rc/Rp and LH/RH reach the thread parser.
+    const match=normalize(rawText).match(new RegExp(`^(?:(\\d+)\\s*[x×]\\s*)?R\\s*(${NUMBER})(?:\\s*(mm|in|inch|["″]))?$`,'i'));
+    return match?{nominal:decimal(Number(match[2])),quantity:Number(match[1]||1),unit:match[3]?/^mm$/i.test(match[3])?'mm':'in':''}:null;
+  }
+  function repairAutoRadius(record,parseRequirement){
+    if(normalizeType(record.type)!=='Diş'||record.autoParse===false||typeof parseRequirement!=='function')return record;
+    // Only repair the old automatic R / ISO 7-1 fingerprint. Deliberate edits,
+    // approved/measured results and real thread specifications stay untouched.
+    const manual=new Set(Array.isArray(record.manualFields)?record.manualFields:[]),protectedKeys=['type','unit','nominalValue','lowerTolerance','upperTolerance','lowerLimit','upperLimit','threadPitch','threadClass','threadStandard','toleranceStandard','evaluationMethod','callout'];
+    if(protectedKeys.some(key=>manual.has(key))||record.nominalSource==='manual'||normalizeStatus(record.status)!=='needs_review'||['approved','corrected','rejected'].includes(record.candidateReviewStatus)||String(record.result??'').trim()||(record.resultStatus&&record.resultStatus!=='pending'))return record;
+    if(!/^ISO\s*7-1$/i.test(record.threadStandard||record.toleranceStandard||'')||(record.callout?.threadForm&&record.callout.threadForm!=='R')||record.callout?.threadHand||record.threadPitch||record.threadClass||record.fitClass||record.toleranceExplicit)return record;
+    if(['lowerTolerance','upperTolerance','lowerLimit','upperLimit'].some(key=>String(record[key]??'').trim()))return record;
+    const radius=plainRadius(record.ocrText);
+    if(!radius||number(record.nominalValue)!==Number(radius.nominal))return record;
+    if(record.originalOcrText&&plainRadius(record.originalOcrText)?.nominal!==radius.nominal)return record;
+    const parsed=parseRequirement(record.ocrText);
+    if(parsed?.type!=='Yarıçap')return record;
+    return syncRequirement({...record,...parsed,quantity:record.quantity??parsed.quantity,threadPitch:'',threadClass:'',threadStandard:'',originalOcrText:record.originalOcrText||record.ocrText,ocrNeedsReview:true,ocrReviewReason:'Önceki otomatik R / boru dişi sınıflandırması yarıçap olarak düzeltildi. Kaynak görüntüsünü kontrol edin.'});
+  }
+  function parseThreadCallout(rawText){
+    let text=String(rawText??'').replace(/[−–—]/g,'-').replace(/[“”″"]/g,'').replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim();
+    let inferredSlash=false;
+    // Frequent OCR loss: "NPT 1/16" is read as "NPT16".
+    text=text.replace(/^(NPTF|NPTR|NPSC|NPSM|NPSL|NPT)\s*16$/i,(all,series)=>{inferredSlash=true;return `${series} 1/16`;});
+    const metric=text.match(/^(?:(\d+)\s*[x×]\s*)?M\s*(\d+(?:[.,]\d+)?)(?:\s*[x×]\s*(\d+(?:[.,]\d+)?))?(?:\s*-?\s*([3-9]\d?[A-Za-z](?:[3-9]\d?[A-Za-z])?))?(?:\s*(LH|RH))?$/i);
+    if(metric){const size=threadSize(metric[2]),pitch=threadSize(metric[3]);if(size!==null&&(!metric[3]||pitch!==null))return threadRecord({size,unit:'mm',pitch:metric[3]?decimal(pitch):'',threadClass:metric[4]||'',form:'M',standard:metric[4]?'ISO 261 / ISO 965-1':'ISO 261',quantity:metric[1],hand:(metric[5]||'').toUpperCase()});}
+    const trapezoid=text.match(/^(?:(\d+)\s*[x×]\s*)?TR\s*(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)(?:\s*\(\s*P\s*(\d+(?:[.,]\d+)?)\s*\))?(?:\s*-?\s*([0-9]+[A-Za-z]))?(?:\s*(LH|RH))?$/i);
+    if(trapezoid){const size=threadSize(trapezoid[2]),lead=threadSize(trapezoid[3]),pitch=threadSize(trapezoid[4]);if(size!==null&&lead!==null&&(!trapezoid[4]||pitch!==null))return threadRecord({size,unit:'mm',pitch:trapezoid[4]?`${decimal(lead)} (P${decimal(pitch)})`:decimal(lead),threadClass:trapezoid[5]||'',form:'Tr',standard:trapezoid[5]?'ISO 2902 / ISO 2903':'ISO 2902',quantity:trapezoid[1],hand:(trapezoid[6]||'').toUpperCase()});}
+    const unified=text.match(new RegExp(`^(?:(\\d+)\\s*[x×]\\s*)?(#\\s*\\d+|${THREAD_FRACTION_RE})\\s*-\\s*(\\d+(?:[.,]\\d+)?)\\s*(UNC|UNF|UNEF|UNR|UNJ|UNS|UN)(?:\\s*-?\\s*([123][AB]))?(?:\\s*(LH|RH))?$`,'i'));
+    if(unified){let size;if(/^#/.test(unified[2])){const gauge=Number(unified[2].replace(/\D/g,''));size=.06+.013*gauge;}else size=threadSize(unified[2]);const tpi=Number(unified[3].replace(',','.'));if(size!==null&&Number.isFinite(tpi)&&tpi>0)return threadRecord({size,unit:'in',pitch:`${decimal(tpi)} TPI`,threadClass:(unified[5]||'').toUpperCase(),form:unified[4].toUpperCase(),standard:'ASME B1.1',quantity:unified[1],hand:(unified[6]||'').toUpperCase()});}
+    const pipeSeries='NPTF|NPTR|NPSC|NPSM|NPSL|NPT';
+    const pipeFirst=text.match(new RegExp(`^(?:(\\d+)\\s*[x×]\\s*)?(${pipeSeries})\\s*(${THREAD_FRACTION_RE})(?:\\s*-\\s*(\\d+(?:[.,]\\d+)?))?(?:\\s*(LH|RH))?$`,'i'));
+    const pipeLast=text.match(new RegExp(`^(?:(\\d+)\\s*[x×]\\s*)?(${THREAD_FRACTION_RE})(?:\\s*-\\s*(\\d+(?:[.,]\\d+)?))?\\s*(${pipeSeries})(?:\\s*(LH|RH))?$`,'i'));
+    if(pipeFirst||pipeLast){const m=pipeFirst||pipeLast,series=(pipeFirst?m[2]:m[4]).toUpperCase(),size=threadSize(pipeFirst?m[3]:m[2]),writtenTpi=pipeFirst?m[4]:m[3],hand=(m[5]||'').toUpperCase(),writtenTpiNumber=writtenTpi?Number(writtenTpi.replace(',','.')):null;if(size!==null&&(!writtenTpi||Number.isFinite(writtenTpiNumber)&&writtenTpiNumber>0)){const pitch=writtenTpi?decimal(writtenTpiNumber):NPT_TPI[decimal(size)]||'',warnings=['Boru dişi nominal boyutudur; gerçek dış çap değildir. Diş ölçü ve mastar uygunluğunu çizimden doğrulayın.'];if(inferredSlash)warnings.push('OCR, NPT16 metnini NPT 1/16 olarak yorumladı; kaynak görüntüsünü doğrulayın.');if(!pitch)warnings.push('Bu boru dişi boyutu için TPI otomatik tamamlanmadı.');return threadRecord({size,unit:'in',pitch:pitch?`${pitch} TPI`:'',threadClass:series,form:series,standard:series==='NPTF'?'ASME B1.20.3':'ASME B1.20.1',quantity:m[1],warnings,hand});}}
+    const isoPipe=text.match(new RegExp(`^(?:(\\d+)\\s*[x×]\\s*)?(G|RC|RP|R)\\s*(${THREAD_FRACTION_RE})(?:\\s*-?\\s*([AB]))?(?:\\s*(LH|RH))?$`,'i'));
+    // R12.5 / R5 are ordinary radius dimensions. Only a fractional pipe size
+    // or explicit thread class/hand disambiguates the single-letter R series.
+    // G, Rc and Rp are already explicit thread-family markers.
+    const explicitPipe=isoPipe&&(isoPipe[2].toUpperCase()!=='R'||isoPipe[3].includes('/')||isoPipe[4]||isoPipe[5]);
+    if(explicitPipe){const form=isoPipe[2].toUpperCase()==='RC'?'Rc':isoPipe[2].toUpperCase()==='RP'?'Rp':isoPipe[2].toUpperCase(),size=threadSize(isoPipe[3]);if(size!==null){const pitch=BSP_TPI[decimal(size)]||'';return threadRecord({size,unit:'in',pitch:pitch?`${pitch} TPI`:'',threadClass:isoPipe[4]?.toUpperCase()||'',form,standard:form==='G'?'ISO 228-1':'ISO 7-1',quantity:isoPipe[1],warnings:['Boru dişi nominal boyutudur; gerçek dış çap değildir. Uygunluğu ilgili mastarla doğrulayın.',...(!pitch?['Bu boru dişi boyutu için TPI otomatik tamamlanmadı.']:[])],hand:(isoPipe[5]||'').toUpperCase()});}}
+    const bsp=text.match(new RegExp(`^(?:(\\d+)\\s*[x×]\\s*)?(${THREAD_FRACTION_RE})\\s*-\\s*(\\d+(?:[.,]\\d+)?)\\s*(BSPP|BSPT)(?:\\s*(LH|RH))?$`,'i'));
+    if(bsp){const size=threadSize(bsp[2]),form=bsp[4].toUpperCase(),tpi=Number(bsp[3].replace(',','.'));if(size!==null&&Number.isFinite(tpi)&&tpi>0)return threadRecord({size,unit:'in',pitch:`${decimal(tpi)} TPI`,threadClass:form,form,standard:form==='BSPP'?'ISO 228-1':'ISO 7-1',quantity:bsp[1],warnings:['Boru dişi nominal boyutudur; gerçek dış çap değildir. Uygunluğu ilgili mastarla doğrulayın.'],hand:(bsp[5]||'').toUpperCase()});}
+    return null;
+  }
   function parseCore(rawText, standard = "", legacyParse) {
+    const radius=plainRadius(rawText),thread=radius?null:parseThreadCallout(rawText);
+    if(thread)return thread;
     let text = normalize(rawText);
+    // Parse pipe callouts before generic fractions, deviations and GD&T heuristics.
+    // A pipe size is a nominal designation, never its measured outside diameter.
+    const pipeText = String(rawText ?? '').replace(/[−–—]/g, '-').replace(/["“”″]/g, '').replace(/\s*\/\s*/g, '/').replace(/\bN\s*P\s*(T\s*F|T\s*R|S\s*C|S\s*M|S\s*L|T)\b/gi, x => x.replace(/\s/g, '')).trim();
+    const pipe = pipeText.match(/^(?:(\d+)\s*[x×]\s*)?(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(NPTF|NPTR|NPSC|NPSM|NPSL|NPT)\s*$/i);
+    if (pipe) {
+      const fraction = pipe[2].match(/^(?:(\d+)\s+)?(\d+)\/(\d+)$/);
+      const size = fraction ? Number(fraction[1] || 0) + Number(fraction[2]) / Number(fraction[3]) : Number(pipe[2]);
+      if (Number.isFinite(size) && size > 0 && Number(pipe[3]) > 0 && (!pipe[1] || Number(pipe[1]) > 0)) {
+        const series = pipe[4].toUpperCase();
+        return {type:'Diş', nominalValue:decimal(size), unit:'in', threadPitch:`${pipe[3]} TPI`, threadClass:series, threadStandard:series==='NPTF'?'ASME B1.20.3':'ASME B1.20.1',
+          lowerTolerance:'',upperTolerance:'',lowerLimit:'',upperLimit:'',fitClass:'',gdtSubtype:'',datumRefs:'',gdtFrame:null,
+          quantity:Number(pipe[1] || 1),evaluationMethod:'OK_NOT_OK',toleranceExplicit:false,
+          toleranceStandard:series==='NPTF'?'ASME B1.20.3':'ASME B1.20.1',
+          parseWarnings:['Boru dişi nominal boyutudur; gerçek dış çap değildir. Diş ölçü ve mastar uygunluğunu çizimden doğrulayın.']};
+      }
+    }
     const parseWarnings = [];
     let quantity = 1;
     const count = text.match(/^([1-9]\d*)\s*(?:[x×]\s*(?=(?:Ø|R|M|C)\s*\d)|(?:YERDE|ADET|DELİK|DELIK|HOLES?|PLACES?)\s*[:=-]?\s*)/i);
@@ -470,9 +629,14 @@
     const result = Object.assign({
       type: "Uzunluk", nominalValue: "", lowerTolerance: "", upperTolerance: "", lowerLimit: "", upperLimit: "",
       unit: "mm", evaluationMethod: "VALUE", toleranceStandard: "", toleranceExplicit: false,
-      fitClass: "", threadPitch: "", threadClass: "", gdtSubtype: "",
+      fitClass: "", threadPitch: "", threadClass: "", threadStandard: "", gdtSubtype: "",
     }, legacy, { datumRefs: "", specialDesignator: "", gdtFrame: null, quantity, parseWarnings });
     result.type = normalizeType(result.type);
+    if(radius){
+      // Remain authoritative even when an older host parser labels R16 as a pipe.
+      if(result.type==='Diş'){result.lowerTolerance=result.upperTolerance=result.lowerLimit=result.upperLimit=result.toleranceStandard='';result.toleranceExplicit=false;}
+      Object.assign(result,{type:'Yarıçap',nominalValue:radius.nominal,quantity:radius.quantity,unit:radius.unit||'mm',evaluationMethod:'VALUE',threadPitch:'',threadClass:'',threadStandard:''});
+    }
     result.callout={basic:/^(?:\[\s*[\d.]|BASIC\b)/i.test(text),reference:/^(?:\(\s*[\d.]|REF\b)/i.test(text),spherical:/^(?:SØ|SR)\s*\d/i.test(text),through:/\bTHRU\b/i.test(text),depth:(text.match(/(?:x|×)\s*(\d+(?:\.\d+)?)\s*(?:DEEP|DEPTH)\b/i)||[])[1]||'',pitchCircleDiameter:(text.match(/Ø\s*(\d+(?:\.\d+)?)\s*PCD\b/i)||[])[1]||'',equallySpaced:/\bEQ\s*SP\b/i.test(text),holeForm:/⌴/.test(text)?'counterbore':/⌵/.test(text)?'countersink':/^SF\b/i.test(text)?'spotface':''};
 
     if (!text) {
@@ -668,16 +832,64 @@
     };
   }
 
+  // A type change is an explicit edit, not another OCR pass. Carry across only
+  // fields whose meaning survives the change; never reinterpret a GD&T zone as
+  // a nominal size or retain a pipe-thread family on an ordinary dimension.
+  function transitionType(record, nextType) {
+    const previous = normalizeType(record.type), type = normalizeType(nextType);
+    if (previous === type) return { ...record, type };
+    const result = { ...record, type, callout: { ...(record.callout || {}) } };
+    const sizeTypes = ['Uzunluk', 'Çap', 'Yarıçap', 'Geçme', 'Pah', 'Tolerans'];
+    const keepSizeLimits = sizeTypes.includes(previous) && sizeTypes.includes(type);
+    if (!fieldProfile(type).numeric || !fieldProfile(previous).numeric || previous === 'GD&T' || type === 'GD&T') result.nominalValue = '';
+    if (!keepSizeLimits) {
+      for (const key of ['lowerTolerance', 'upperTolerance', 'lowerLimit', 'upperLimit']) result[key] = '';
+      result.limitDimension = false;
+      result.nominalSource = result.nominalValue ? 'manual' : '';
+      result.toleranceExplicit = false;
+      result.toleranceAmbiguous = false;
+      result.toleranceStandard = '';
+    }
+    result.gdtSubtype = '';
+    result.gdtFrame = null;
+    result.cells = [];
+    result.datumRefs = '';
+    result.threadPitch = '';
+    result.threadClass = '';
+    result.threadStandard = '';
+    result.fitClass = ['Çap', 'Geçme', 'Uzunluk'].includes(previous) && ['Çap', 'Geçme', 'Uzunluk'].includes(type) ? result.fitClass || '' : '';
+    if (record.fitClass && !result.fitClass) {
+      for (const key of ['lowerTolerance', 'upperTolerance', 'lowerLimit', 'upperLimit']) result[key] = '';
+      result.toleranceStandard = '';
+      result.toleranceExplicit = false;
+      result.limitDimension = false;
+    }
+    result.chamferAngle = '';
+    result.chamferAngleTolerance = '';
+    result.specialDesignator = '';
+    result.surfaceTexture = null;
+    result.angleFormat = type === 'Açı' ? 'decimal' : '';
+    const allowedCallouts = new Set(sizeTypes.includes(type) || type === 'Açı' ? ['basic', 'reference'] : []);
+    if (['Çap', 'Yarıçap'].includes(type)) allowedCallouts.add('spherical');
+    if (['Çap', 'Geçme', 'Diş'].includes(type)) for (const key of ['depth', 'through', 'pitchCircleDiameter', 'equallySpaced']) allowedCallouts.add(key);
+    if (['Çap', 'Geçme'].includes(type)) for (const key of ['holeForm', 'countersinkAngle', 'secondaryDiameter', 'secondaryThrough']) allowedCallouts.add(key);
+    for (const key of Object.keys(result.callout)) if (!allowedCallouts.has(key)) delete result.callout[key];
+    // Old source evidence remains in ocrText; generated field provenance must
+    // not claim that the newly selected family was recognized by the OCR.
+    result.measurementEvidence = null;
+    return result;
+  }
+
   // Display text is derived from structured fields, never parsed back into them.
   function generateRequirement(record) {
     const decimal = value => displayNumber(value, record);
     const type = normalizeType(record.type), n = number(record.nominalValue);
     const lo = number(record.lowerTolerance), hi = number(record.upperTolerance);
     const min = number(record.lowerLimit), max = number(record.upperLimit);
-    const unit = record.unit && !['mm', '°'].includes(record.unit) ? ` ${record.unit}` : '';
+    const unit = record.unit && !['mm', '°', '—'].includes(record.unit) ? ` ${record.unit}` : '';
     const signed = v => (v > 0 ? '+' : '') + decimal(v);
     const deviations = lo !== null && hi !== null
-      ? (lo === 0 && hi === 0 ? ' (0/0)' : lo < 0 && Math.abs(lo + hi) < 1e-9 ? ` ±${decimal(hi)}` : ` (${signed(hi)}/${signed(lo)})`)
+      ? (lo === 0 && hi === 0 ? ' (0/0)' : lo < 0 && hi > 0 && Math.abs(lo + hi) <= Math.max(Math.abs(lo), Math.abs(hi)) * Number.EPSILON * 4 ? ` ±${decimal(hi)}` : ` (${signed(hi)}/${signed(lo)})`)
       : lo !== null ? ` (alt ${signed(lo)})` : hi !== null ? ` (üst ${signed(hi)})` : '';
     const prefix = type === 'Çap' ? 'Ø' : type === 'Yarıçap' ? 'R' : '';
     let value = '';
@@ -693,8 +905,24 @@
       if (!record.datumRefs) return null;
       value = `Datum ${record.datumRefs}`;
     } else if (type === 'Diş') {
-      if (n === null || record.unit === 'in' || /TPI/i.test(record.threadPitch || '')) return null;
-      value = `M${decimal(n)}${record.threadPitch ? ' × ' + record.threadPitch : ''}${record.threadClass ? '-' + record.threadClass : ''}`;
+      const form=record.callout?.threadForm||'';
+      const hand=record.callout?.threadHand?` ${record.callout.threadHand}`:'';
+      const threadNominal=n===null?'':limitDecimal(String(n));
+      const fractionSize=value=>{let size=decimal(value);for(const d of [2,4,8,16,32,64])if(Math.abs(value*d-Math.round(value*d))<1e-8){const whole=Math.floor(value),part=Math.round((value-whole)*d);size=part?`${whole?whole+' ':''}${part}/${d}`:String(whole);break;}return size;};
+      const pitch=String(record.threadPitch||'').trim().replace(/,/g,'.');
+      const tpi=pitch.match(/^(\d+(?:\.\d+)?)\s*TPI$/i);
+      if(n===null||n<=0)return null;
+      if(['G','R','Rc','Rp'].includes(form))value=`${form} ${fractionSize(n)}${record.threadClass?' '+record.threadClass:''}${hand}`;
+      else if(['BSPP','BSPT'].includes(form)&&tpi&&Number(tpi[1])>0)value=`${fractionSize(n)}-${tpi[1]} ${form}${hand}`;
+      else if(/^(UNC|UNF|UNEF|UNR|UNJ|UNS|UN)$/.test(form)&&tpi&&Number(tpi[1])>0)value=`${fractionSize(n)}-${tpi[1]} ${form}${record.threadClass?'-'+record.threadClass:''}${hand}`;
+      else if(form==='Tr'&&/^\d+(?:\.\d+)?(?:\s*\(P\d+(?:\.\d+)?\))?$/.test(pitch)&&Number.parseFloat(pitch)>0)value=`Tr${threadNominal} × ${pitch}${record.threadClass?'-'+record.threadClass:''}${hand}`;
+      else if(/^(NPTF|NPTR|NPSC|NPSM|NPSL|NPT)$/.test(record.threadClass||'')&&tpi&&Number(tpi[1])>0)value=`${fractionSize(n)}-${tpi[1]} ${record.threadClass}${hand}`;
+      else {
+        // Unknown inch families and incomplete Tr/BSP/UN data must never turn
+        // into an invented metric thread just because a numeric size exists.
+        if(record.unit==='in'||/TPI/i.test(pitch)||(form&&form!=='M')||(pitch&&(number(pitch)===null||number(pitch)<=0)))return null;
+        value=`M${threadNominal}${pitch?' × '+limitDecimal(pitch):''}${record.threadClass?'-'+record.threadClass:''}${hand}`;
+      }
     } else if (type === 'Pah') {
       if (record.limitDimension && min!==null && max!==null) value=`${decimal(min)}–${decimal(max)}`;
       else if(n!==null)value=`${decimal(n)}${deviations}`;
@@ -702,7 +930,7 @@
       value += `${record.chamferAngle ? ' × ' + record.chamferAngle + '°' : ' pah'}${record.chamferAngleTolerance ? ' ±' + record.chamferAngleTolerance + '°' : ''}${unit}`;
     } else if (type === 'Yüzey') {
       const label = /^(?:R(?:a|z|q|t|p|v|max|zjis|sk|ku|sm)|S[aqzpv]|RMS|CLA)$/i.test(record.specialDesignator || '') ? record.specialDesignator : 'Yüzey';
-      if(lo!==null&&hi!==null&&n!==null)value=`${label} ${decimal(n)}${deviations}${unit}`;
+      if((lo!==null||hi!==null)&&n!==null)value=`${label} ${decimal(n)}${deviations}${unit}`;
       else if(min!==null&&max!==null&&min!==0)value=`${label} ${decimal(min)}–${decimal(max)}${unit}`;
       else if(max!==null)value=`${label} ${record.upperInclusive===false?'<':'≤'}${decimal(max)}${unit}`;
       else if(min!==null)value=`${label} ${record.lowerInclusive===false?'>':'≥'}${decimal(min)}${unit}`;
@@ -715,10 +943,30 @@
         value = min !== null && max !== null ? `${prefix}${decimal(min)}–${decimal(max)}${angle}${unit}`
           : `${prefix}${max !== null ? record.upperInclusive === false ? '<' : '≤' : record.lowerInclusive === false ? '>' : '≥'}${decimal(max ?? min)}${angle}${unit}`;
       } else if (n !== null) {
-        value = `${prefix}${decimal(n)}${angle}${record.fitClass ? ' ' + record.fitClass : ''}${deviations}${unit}`;
-      } else return null;
-    } else return null; // Notes, materials and processes are meaningful free text.
-    const callout=record.callout||{};if(callout.spherical&&!/^S/.test(value))value='S'+value;if(callout.depth)value+=' x '+callout.depth+' DEEP';if(callout.countersinkAngle)value+=' x '+callout.countersinkAngle+'°';if(callout.through)value+=' THRU';if(callout.secondaryDiameter)value+=' / Ø'+callout.secondaryDiameter+(callout.secondaryThrough?' THRU':'');if(callout.holeForm)value=({counterbore:'⌴ ',countersink:'⌵ ',spotface:'SF '}[callout.holeForm]||'')+value;if(callout.pitchCircleDiameter)value+=(callout.equallySpaced?' EQ SP ON ':' ON ')+'Ø'+callout.pitchCircleDiameter+' PCD';if(callout.basic)value='[ '+value+' ]';if(callout.reference)value='( '+value+' )';
+        value = `${prefix}${decimal(n)}${angle}${['Çap','Geçme','Uzunluk'].includes(type)&&record.fitClass ? ' ' + record.fitClass : ''}${deviations}${unit}`;
+      } else if(type==='Tolerans'&&deviations)value=deviations.trim()+unit;
+      else return null;
+    } else {
+      // Free-text families have no safe numeric reconstruction. In automatic
+      // mode the current corrected OCR is their requirement, never old numbers.
+      return typeof record.ocrText==='string'&&record.ocrText.trim()?record.ocrText.trim():null;
+    }
+    const callout=record.callout||{};
+    if(['Çap','Yarıçap'].includes(type)&&callout.spherical&&!/^S/.test(value))value='S'+value;
+    if(['Çap','Geçme','Diş'].includes(type)){
+      if(callout.depth)value+=' x '+callout.depth+' DEEP';
+      if(callout.through)value+=' THRU';
+      if(callout.pitchCircleDiameter)value+=(callout.equallySpaced?' EQ SP ON ':' ON ')+'Ø'+callout.pitchCircleDiameter+' PCD';
+    }
+    if(['Çap','Geçme'].includes(type)){
+      if(callout.countersinkAngle)value+=' x '+callout.countersinkAngle+'°';
+      if(callout.secondaryDiameter)value+=' / Ø'+callout.secondaryDiameter+(callout.secondaryThrough?' THRU':'');
+      if(callout.holeForm)value=({counterbore:'⌴ ',countersink:'⌵ ',spotface:'SF '}[callout.holeForm]||'')+value;
+    }
+    if(['Uzunluk','Çap','Yarıçap','Açı','Geçme','Pah','Tolerans'].includes(type)){
+      if(callout.basic)value='[ '+value+' ]';
+      if(callout.reference)value='( '+value+' )';
+    }
     return Number(record.quantity) > 1 ? `${record.quantity} × ${value}` : value;
   }
 
@@ -731,11 +979,11 @@
     const tolerance=kind==='gdt'?'geometric-zone':hasLimits?'limits':lo!==null&&hi!==null?(lo===-hi?'symmetric':lo===0||hi===0?'unilateral':'asymmetric'):lo!==null||hi!==null?'one-sided':'unspecified';
     const errors=consistencyErrors(record),warnings=activeWarnings(record);
     const valid=errors.length===0&&!record.toleranceAmbiguous&&!(min!==null&&max!==null&&min>max)&&(kind==='gdt'?record.gdtSubtype&&record.gdtSubtype!=='unknown'&&hi!==null:fieldProfile(record.type).numeric&&(n!==null||min!==null||max!==null));
-    const signature=JSON.stringify([kind,record.type,tolerance,n,lo,hi,min,max,record.unit,record.quantity||1,record.gdtSubtype,record.gdtFrame?.cells,record.threadPitch,record.threadClass,record.fitClass,record.chamferAngle,record.specialDesignator]);
+    const signature=JSON.stringify([kind,record.type,tolerance,n,lo,hi,min,max,record.unit,record.quantity||1,record.gdtSubtype,record.gdtFrame?.cells,record.threadPitch,record.threadClass,record.threadStandard,record.fitClass,record.chamferAngle,record.specialDesignator]);
     return {kind,tolerance,valid:Boolean(valid),warnings,errors,signature};
   }
 
-  function syncRequirement(record, force = false) {
+  function syncRequirement(record, force = false, options = {}) {
     record=normalizeLimitDimension(record);
     if(record.type==='GD&T')record=withGdtSubtype(record);
     if(record.type==='GD&T'&&force){
@@ -747,7 +995,8 @@
     const sameAsOcr = record.ocrText && String(record.requirement || '').replace(/\s/g,'') === String(record.ocrText).replace(/\s/g,'');
     const mode = force ? 'auto' : marked ? 'manual' : ['auto','manual'].includes(record.requirementMode) ? record.requirementMode
       : record.autoParse === false ? 'manual' : !record.requirement || sameAsOcr ? 'auto' : 'manual';
-    return { ...record, ...(force ? {manualFields:(record.manualFields || []).filter(name => name !== 'requirement')} : {}), requirementMode: mode, requirement: mode === 'auto' && generated !== null ? generated : String(record.requirement || '') };
+    const clearIncomplete = (force || options.clearIncomplete) && (fieldProfile(record.type).numeric || normalizeType(record.type)==='Datum');
+    return { ...record, ...(force ? {manualFields:(record.manualFields || []).filter(name => name !== 'requirement')} : {}), requirementMode: mode, requirement: mode === 'auto' ? generated !== null ? generated : clearIncomplete ? '' : String(record.requirement || '') : String(record.requirement || '') };
   }
 
   function limits(record) {
@@ -883,8 +1132,9 @@
       const places=Math.max(p,fraction.length);
       return whole+(places?'.'+fraction.padEnd(places,'0'):'');
     }
-    if(!Number.isInteger(p)||p<0||p>6)return decimal(n);
-    const natural=decimal(n),digits=(natural.split('.')[1]||'').length;
+    if(!Number.isInteger(p)||p<0||p>6)return limitDecimal(n);
+    const natural=limitDecimal(n),digits=(natural.split('.')[1]||'').length;
+    if(digits>12)return natural;
     return n.toFixed(Math.min(12,Math.max(p,digits)));
   }
   function datumTokens(value){
@@ -892,5 +1142,5 @@
     const parts=(text.includes('|')?text.split('|'):text.split(/\s+/)).map(s=>s.trim().toUpperCase());
     while(parts.length&&!parts.at(-1))parts.pop();return parts;
   }
-  global.ASMachRequirements = Object.freeze({ normalizeLimitDimension, assessReading, parseSurface, parseAngularCallout, parseAngle, formatAngle, displayNumber, parse, normalize, generateRequirement, syncRequirement, fitNotation, isoFitLookup, fitClasses: Object.freeze(Object.keys(ISO_FIT_TABLES)), datumTokens, gdtCells, detectGdt, GDT_TYPES, gdtOptions, withGdtSubtype, evaluate, consistencyErrors, activeWarnings, fieldProfile, TYPES, STATUSES, validate, normalizeStatus, normalizeType });
+  global.ASMachRequirements = Object.freeze({ applyDrawingTolerance, measurementEvidence, normalizeLimitDimension, transitionType, repairAutoRadius, assessReading, parseSurface, parseAngularCallout, parseAngle, formatAngle, displayNumber, parse, normalize, generateRequirement, syncRequirement, fitNotation, isoFitLookup, fitClasses: Object.freeze(Object.keys(ISO_FIT_TABLES)), datumTokens, gdtCells, detectGdt, GDT_TYPES, gdtOptions, withGdtSubtype, evaluate, consistencyErrors, activeWarnings, fieldProfile, TYPES, STATUSES, validate, normalizeStatus, normalizeType, MEASUREMENT_INTENTS, normalizeMeasurementIntent, measurementIntentEvidence, measurementIntentScore, applyMeasurementIntent });
 })(typeof window === "undefined" ? globalThis : window);

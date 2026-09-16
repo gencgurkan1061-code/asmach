@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "model": "asmtech.traineddata.gz",
+  "trainingReport": "training-report.json",
+  "report": "evaluation-100.json",
+  "reason": "100-case application evaluation failed: 84 baseline vs 77 candidate, regressions and increased reading latency. Not approved for production or installer."
+}

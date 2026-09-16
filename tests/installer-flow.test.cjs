@@ -12,9 +12,12 @@ test('clean removal precedes file installation and preserves the running-app gua
  assert.ok(install.indexOf('Call RemovePreviousVersion')<install.indexOf('File "${MAINBINARYSRCPATH}"'));
  const leave=template.split('Function PageLeaveReinstall')[1].split('FunctionEnd')[0];
  assert.match(leave,/\$ReinstallPageCheck = 2[\s\S]*Call RemovePreviousVersion[\s\S]*Quit/);
- assert.ok(!leave.includes('$ReinstallPageCheck = 3')); // clean removal must never occur on this page
+ assert.ok(!/\$ReinstallPageCheck = 3[\s\S]*Call RemovePreviousVersion/.test(leave)); // clean removal occurs in the install section only
  assert.ok(template.includes('/S /UPDATE _?=$PreviousInstallDir'));
- assert.ok(!template.split('Function RequireAppClosed')[1].split('FunctionEnd')[0].includes('KillProcess'));
+ const guard=template.split('Function RequireAppClosed')[1].split('FunctionEnd')[0];
+ assert.ok(!guard.includes('KillProcess'));
+ assert.ok(guard.includes('MB_RETRYCANCEL')&&guard.includes('app_close_retry'));
+ assert.ok(template.includes('Function CleanLocalData')&&template.includes('RMDir /r "$APPDATA\\${BUNDLEID}"'));
 });
 test('public installer is small and offline installer stays available separately',()=>{
  assert.equal(config.bundle.windows.webviewInstallMode.type,'embedBootstrapper');

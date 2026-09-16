@@ -15,6 +15,7 @@ const engine = context.window.ASMachRequirements;
 context.window.ASMachRequirements = {...engine, parse: text => engine.parse(text, "", context.parseTechnicalRequirementLegacy)};
 vm.runInContext(fs.readFileSync(path.join(root, "src/workflow.js"), "utf8"), context);
 const workflow = context.window.ASMachWorkflow;
+for(const text of ['1/8-27 NPT','"1 / 8"" - 27 NPT"','1 1/4-11.5 NPT']) assert.ok(workflow.technicalScore(text)>=35,text);
 const word = (text, x, y = .1, w = .025, h = .02, extra = {}) => ({text, x, y, w, h, confidence: 95, ...extra});
 for(const [text,lo,hi]of [['20.2° (+0.8/+0.3)',.3,.8],['20,2º +0,8+0,3',.3,.8],['120° +0.2/0',0,.2],['45° ±0.5',-.5,.5]]){const parsed=engine.parse(text);assert.equal(parsed.type,'Açı');assert.equal(Number(parsed.lowerTolerance),lo);assert.equal(Number(parsed.upperTolerance),hi);assert.ok(workflow.technicalScore(text)>=35,text);}
 assert.equal(workflow.technicalScore('20° 30'),0,'Do not consume a neighbouring unsigned dimension');

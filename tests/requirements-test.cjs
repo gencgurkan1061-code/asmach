@@ -19,6 +19,19 @@ vm.runInContext(fs.readFileSync(path.join(root, "src/requirements-engine.js"), "
 const api = context.window.ASMachRequirements;
 const parse = (text, standard = "") => api.parse(text, standard, context[parserName]);
 let checks = 0;
+for (const text of ['1/8-27 NPT', '"1 / 8"" - 27 NPT"', '1 / 8 – 27 N P T', '1/8-27\nNPT']) {
+  const r=parse(text,'ISO 2768-mK');
+  assert.equal(r.type,'Diş',text);assert.equal(r.nominalValue,'0.125',text);
+  assert.equal(r.threadPitch,'27 TPI');assert.equal(r.threadClass,'NPT');assert.equal(r.unit,'in');
+  assert.equal(r.lowerTolerance,'');assert.equal(r.upperLimit,'');
+  assert.equal(api.generateRequirement(r),'1/8-27 NPT');
+}
+for(const series of ['NPTF','NPTR','NPSC','NPSM','NPSL']) {
+  const r=parse('1 1/4-11.5 '+series);assert.equal(r.nominalValue,'1.25');assert.equal(r.threadClass,series);
+  assert.equal(api.generateRequirement(r),'1 1/4-11.5 '+series);
+}
+assert.equal(parse('3 x 1/8-27 NPT').quantity,3);
+for(const text of ['NOT: 1/8-27 NPT','1/0-27 NPT','1/8-0 NPT'])assert.notEqual(parse(text).threadClass,'NPT');
 function check(text, expected, standard = "") {
   const actual = parse(text, standard);
   for (const [key, value] of Object.entries(expected)) {
@@ -53,8 +66,17 @@ check("24.9 / 25.1", { nominalValue: "25", lowerLimit: "24.9", upperLimit: "25.1
 check("25.1\n24.9", { nominalValue: "25", lowerLimit: "24.9", upperLimit: "25.1" });
 check("MIN 24.9 MAX 25.1", { lowerLimit: "24.9", upperLimit: "25.1" });
 check("4x Ø6 ±0.05", { type: "Çap", nominalValue: "6", lowerLimit: "5.95", quantity: 4 });
-check("6x M8x1.25-6H", { type: "Diş", nominalValue: "8", threadPitch: "1.25", threadClass: "6H", quantity: 6, lowerTolerance: "", evaluationMethod: "OK_NOT_OK" });
-check("1/4-20 UNC-2B", { type: "Diş", nominalValue: "0.25", unit: "in", threadPitch: "20 TPI", threadClass: "2B" });
+check("6x M8x1.25-6H", { type: "Diş", nominalValue: "8", threadPitch: "1.25", threadClass: "6H", threadStandard: "ISO 261 / ISO 965-1", quantity: 6, lowerTolerance: "", evaluationMethod: "OK_NOT_OK" });
+check("1/4-20 UNC-2B", { type: "Diş", nominalValue: "0.25", unit: "in", threadPitch: "20 TPI", threadClass: "2B", threadStandard: "ASME B1.1" });
+check("M3", { type: "Diş", nominalValue: "3", unit: "mm", threadPitch: "", toleranceStandard: "ISO 261", threadStandard: "ISO 261" });
+check("M3 × 0,5-6H", { type: "Diş", nominalValue: "3", threadPitch: "0.5", threadClass: "6H", toleranceStandard: "ISO 261 / ISO 965-1", threadStandard: "ISO 261 / ISO 965-1" });
+check("#10-24 UNC-2B", { type: "Diş", nominalValue: "0.19", unit: "in", threadPitch: "24 TPI", threadClass: "2B", toleranceStandard: "ASME B1.1", threadStandard: "ASME B1.1" });
+check("NPT16", { type: "Diş", nominalValue: "0.0625", threadPitch: "27 TPI", threadClass: "NPT", toleranceStandard: "ASME B1.20.1", threadStandard: "ASME B1.20.1" });
+check("NPT 1/16", { type: "Diş", nominalValue: "0.0625", threadPitch: "27 TPI", threadClass: "NPT", threadStandard: "ASME B1.20.1" });
+check("G 1/4 A", { type: "Diş", nominalValue: "0.25", threadPitch: "19 TPI", threadClass: "A", toleranceStandard: "ISO 228-1", threadStandard: "ISO 228-1" });
+check("Rc 1/8", { type: "Diş", nominalValue: "0.125", threadPitch: "28 TPI", toleranceStandard: "ISO 7-1", threadStandard: "ISO 7-1" });
+check("Tr20x4", { type: "Diş", nominalValue: "20", unit: "mm", threadPitch: "4", toleranceStandard: "ISO 2902", threadStandard: "ISO 2902" });
+for(const [text,canonical] of [["M3","M3"],["M3 × 0.5-6H","M3 × 0.5-6H"],["#10-24 UNC-2B","0.19-24 UNC-2B"],["NPT 1/16","1/16-27 NPT"],["G 1/4 A","G 1/4 A"],["Rc 1/8","Rc 1/8"],["Tr20x4","Tr20 × 4"]])assert.equal(api.generateRequirement(parse(text)),canonical,text);
 check("2 x 45°", { type: "Pah", nominalValue: "2", chamferAngle: "45", unit: "mm", lowerTolerance: "", evaluationMethod: "OK_NOT_OK" });
 check("2 ±0.1 x 45° ±1°", { type: "Pah", nominalValue: "2", chamferAngle: "45", chamferAngleTolerance: "1", lowerLimit: "1.9", upperLimit: "2.1" });
 check("C0.5", { type: "Pah", nominalValue: "0.5", chamferAngle: "" });
@@ -120,4 +142,11 @@ assert.equal(api.normalizeType("dimension"), "Uzunluk");
 assert.equal(api.fieldProfile("GD&T").nominal, false);
 assert.equal(api.fieldProfile("Malzeme").numeric, false);
 assert.equal(api.STATUSES.length, 6);
+assert.ok(api.measurementIntentScore('M8x1.25-6H','Diş')>api.measurementIntentScore('8','Diş'));
+assert.ok(api.measurementIntentScore('Ra 3.2','Yüzey')>0);
+assert.ok(api.measurementIntentScore('MIN 24.9 MAX 25.1','Limit ölçü')>0);
+const forcedDiameter=api.applyMeasurementIntent(parse('13'),'13','Çap');
+assert.equal(forcedDiameter.type,'Çap');assert.equal(forcedDiameter.measurementIntentValid,true);
+const invalidThread=api.applyMeasurementIntent(parse('13'),'13','Diş');
+assert.equal(invalidThread.type,'Diş');assert.equal(invalidThread.measurementIntentValid,false);assert.match(invalidThread.ocrReviewReason,/doğrulanamadı/);
 console.log(`Requirements engine: ${checks} field/evaluation checks and 15 structure/validation checks passed.`);

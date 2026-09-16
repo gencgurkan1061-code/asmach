@@ -1,8 +1,12 @@
 # ASMach — Windows / Tauri 2
 
+## 3.0.3 paket durumu — 16 Eylül 2026
+
+Kaynak ve masaüstü ön yüzü 3.0.3 olarak hazırlandı. Yeni NSIS kurulum dosyası henüz oluşturulmadı: bu bilgisayarda Windows Uygulama Denetimi hem Rustup Cargo başlatıcısını hem de kurulu toolchain içindeki `cargo.exe` dosyasını engelliyor (OS 4551). İzinli derleme denemesi de aynı nedenle durdu. `3.0.2` kurulum dosyası 3.0.3 olarak yeniden adlandırılmamalı veya yayınlanmamalı. Derleyiciye yönetici tarafından izin verildikten sonra `powershell -File scripts/desktop.ps1 build` çalıştırılmalı; test ve kurulum doğrulaması tamamlanmadan yayın bildirimi güncellenmemeli.
+
 ## Bu bilgisayardaki doğrulama durumu — 15 Eylül 2026
 
-2.0.6 üretim uygulaması, küçük çevrimiçi kurulum paketi ve WebView2 içeren çevrimdışı kurulum paketi oluşturuldu. Rust üretim derlemesi ile masaüstü köprüsü, kurulum, Windows tipi lisans sihirbazı, kaydırılabilir form alanları, lisans talebi ve çevrimdışı lisans testleri geçti.
+3.0.2 üretim uygulaması ve küçük çevrimiçi kurulum paketi oluşturuldu. Lisans denetimi görünür bir ara pencere açmadan yapılır; çevrimdışı kod girişi lisans sihirbazındadır. Ayarlar içinden imzalı güncelleme denetimi yapılabilir. Diş OCR sonuçlarında standart ayrı bir alanda saklanır ve gösterilir. Kurulum paketi yeni kurulum, güncelleme, kaldırma ve yerel verileri sıfırlayan temiz kurulum akışlarını destekler.
 
 Ana dağıtım hedefi Windows masaüstü uygulamasıdır. HTML/CSS/JavaScript arayüzü Tauri paketinin içindedir; **kurulu uygulamada Node.js, PowerShell web sunucusu veya internet gerekmez**. Node.js ve geliştirme sunucusu yalnız geliştirme sırasında kullanılır.
 

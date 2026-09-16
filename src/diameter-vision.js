@@ -59,10 +59,18 @@
     const angle=((Number(reading.angle)||0)%360+360)%360;
     if(angle!==((evidence.angle%360+360)%360))return reading;
     const b=evidence.box,overlaps=w=>{if(!b)return false;const area=Math.max(0,Math.min(w.x+w.w,b.x+b.w)-Math.max(w.x,b.x))*Math.max(0,Math.min(w.y+w.h,b.y+b.h)-Math.max(w.y,b.y));return area/(b.w*b.h)>.45;};
-    let corrected=false;const words=(reading.words||[]).map(w=>{if(overlaps(w)&&/^[©CcOo0Φφ⌀Ø]$/.test(w.text.trim())){corrected=true;return {...w,text:'Ø'};}return w;});
+    let corrected=false;let words=(reading.words||[]).map(w=>{if(overlaps(w)&&/^[©CcOo0Φφ⌀Ø]$/.test(w.text.trim())){corrected=true;return {...w,text:'Ø'};}return w;});
     const prefixed=/^[©Φφ⌀Oo]\s*(?=\d)/.test(reading.text);
-    if(!corrected&&!prefixed)return reading;
+    // OCR may omit the graphical Ø entirely while still reading the following
+    // number perfectly. Restore it only when independent pixel evidence sits
+    // immediately before the first numeric OCR box on the same text row.
+    const firstNumber=words.filter(w=>/^(?!0\d)\d/.test(String(w.text||'').trim())&&Number.isFinite(w.x)&&Number.isFinite(w.y)&&Number.isFinite(w.w)&&Number.isFinite(w.h)).sort((a,b)=>a.x-b.x)[0];
+    const rowOverlap=firstNumber&&Math.max(0,Math.min(firstNumber.y+firstNumber.h,b.y+b.h)-Math.max(firstNumber.y,b.y))/Math.max(.0001,Math.min(firstNumber.h,b.h));
+    const gap=firstNumber?firstNumber.x-(b.x+b.w):Infinity;
+    const omitted=Boolean(firstNumber&&/^(?!0\d)\d+(?:[.,]\d+)?(?:\s|$)/.test(reading.text.trim())&&rowOverlap>.35&&gap>-Math.min(b.w,firstNumber.w)*.25&&gap<Math.max(b.h,firstNumber.h)*1.8);
+    if(!corrected&&!prefixed&&!omitted)return reading;
     let text=reading.text.replace(/^[©Φφ⌀Oo]\s*(?=\d)/,'Ø');
+    if(omitted){text='Ø'+text;words=[{text:'Ø',confidence:evidence.confidence||90,angle,x:b.x,y:b.y,w:b.w,h:b.h,visual:true},...words];}
     if(corrected&&root.ASMachMeasurementLayout){const layout=root.ASMachMeasurementLayout.reconstruct(words,{width:evidence.width||1,height:evidence.height||1,ocr:true,details:true});if(layout?.structured&&!layout.missingDigits)text=layout.text;}
     if(!/^Ø/.test(text))return reading;
     return {...reading,rawText:reading.rawText||reading.text,text,words,symbolRecovery:'Çap simgesi kaynak görüntüden doğrulandı'};

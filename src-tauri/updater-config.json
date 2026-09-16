@@ -1,3 +1,4 @@
 {
-  "url": "https://asmach-license.licensing-service.workers.dev/version/{{target}}/{{arch}}/{{current_version}}"
+  "url": "https://asmach-release.licensing-service.workers.dev/update.json",
+  "public_key": "Nr007C6NfxVB0duXMqDua4QwKsy3h1HyeHRksXkgjB8="
 }

@@ -1,6 +1,8 @@
 (function(root){
  function init(){
   const shortcuts=new Map();
+  let measurementType=document.getElementById('boxMeasurementType');
+  if(!measurementType){measurementType=document.createElement('input');measurementType.type='hidden';measurementType.id='boxMeasurementType';measurementType.value='';document.body.append(measurementType);}
   function choices(id,items){const select=document.getElementById(id);if(!select)return;select.hidden=true;const bar=document.createElement('div');bar.className='qt-options';bar.setAttribute('role','group');bar.setAttribute('aria-label',select.getAttribute('aria-label'));select.after(bar);
    for(const [value,label,key] of items){const button=document.createElement('button');button.type='button';button.className='btn qt-choice';button.dataset.choice=value;button.dataset.for=id;button.textContent=label;button.title=label+' · '+key.toUpperCase();button.setAttribute('aria-keyshortcuts',key.toUpperCase());button.onclick=()=>{select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));};bar.append(button);shortcuts.set(key,button);}
    const sync=()=>bar.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(root.ASMachApp?.state.mode==='box'&&b.dataset.choice===select.value)));select.addEventListener('change',sync);const modeButton=document.getElementById('boxOcrModeButton');if(modeButton)new MutationObserver(sync).observe(modeButton,{attributes:true,attributeFilter:['class']});sync();
@@ -31,6 +33,11 @@ document.addEventListener('keydown',e=>{if(root.ASMachKeyboard?.inWorkspace()||e
   #qtDrawingMenu button[aria-checked=true]::after{content:'✓';font-size:15px;font-weight:800;color:#007384}
   #qtDrawingMenu button[aria-checked=true] .qt-menu-icon{border:0;background:transparent}
   #qtDrawingMenu button[aria-checked=true] kbd{color:#236571}
+  #qtDrawingMenu .qt-submenu-host{position:relative}
+  #qtDrawingMenu .qt-submenu-host>button::after{content:'›';font-size:17px;line-height:1;color:#526b7d}
+  #qtDrawingMenu .qt-submenu{display:none;position:fixed;z-index:2147483647;width:210px;padding:4px;border:1px solid #aeb9c2;border-radius:4px;background:#fafafa;box-shadow:2px 5px 16px #172b3c40}
+  #qtDrawingMenu .qt-submenu-host[data-open=true]>.qt-submenu{display:block}
+  #qtDrawingMenu .qt-submenu .qt-menu-heading{padding-left:8px;margin:0 0 2px}
   #qtDrawingMenu .qt-menu-icon svg{width:16px!important;height:16px!important;flex:0 0 16px!important;pointer-events:none}
   #qtDrawingMenu .qt-menu-icon{width:20px;height:20px;display:grid;place-items:center;box-sizing:border-box}
   #qtDrawingMenu kbd{font:10px 'Segoe UI',sans-serif;color:#64717c;white-space:nowrap}
@@ -96,6 +103,23 @@ document.addEventListener('keydown',e=>{if(root.ASMachKeyboard?.inWorkspace()||e
   const close=(restore=false)=>{if(!menu.matches(':popover-open'))return;menu.hidePopover();if(restore&&previousFocus?.isConnected)previousFocus.focus();};
   function heading(text){const h=document.createElement('div');h.className='qt-menu-heading';h.setAttribute('role','presentation');h.textContent=text;menu.append(h);}
   function action(selector,label,key,icon,radio=false){const source=document.querySelector(selector);if(!source)return;const b=document.createElement('button');b.type='button';b.dataset.source=selector;b.disabled=source.disabled;b.setAttribute('role',radio?'menuitemradio':'menuitem');if(radio)b.setAttribute('aria-checked',(source.getAttribute('aria-pressed')==='true'&&(!source.matches('.qt-choice')||root.ASMachApp?.state.mode==='box'))?'true':'false');const i=document.createElement('span');i.className='qt-menu-icon';i.setAttribute('aria-hidden','true');const info=toolIcon(i,selector,label);const name=document.createElement('span');name.textContent=info.label;const k=document.createElement('kbd');k.textContent=source.getAttribute('aria-keyshortcuts')||key;b.append(i,name,k);b.onclick=()=>{close();if(!source.disabled)source.click();};menu.append(b);}
+  function measurementSubmenu(){
+   const source=document.querySelector('[data-for="boxContentMode"][data-choice="dimension"]');if(!source)return;
+   const host=document.createElement('div');host.className='qt-submenu-host';
+   const trigger=document.createElement('button');trigger.type='button';trigger.setAttribute('role','menuitem');trigger.setAttribute('aria-haspopup','menu');trigger.setAttribute('aria-expanded','false');
+   const icon=document.createElement('span');icon.className='qt-menu-icon';icon.setAttribute('aria-hidden','true');toolIcon(icon,'[data-for="boxContentMode"][data-choice="dimension"]','Ölçü');
+   const name=document.createElement('span'),key=document.createElement('kbd');name.textContent='Ölçü';key.textContent='Alt+2';trigger.append(icon,name,key);
+   const submenu=document.createElement('div');submenu.className='qt-submenu';submenu.setAttribute('role','menu');submenu.setAttribute('aria-label','Algılanacak ölçü türü');
+   const title=document.createElement('div');title.className='qt-menu-heading';title.textContent='ALGILANACAK ÖLÇÜ TÜRÜ';submenu.append(title);
+   const options=[['','Otomatik tür seçimi','✧'],['Uzunluk','Uzunluk','↔'],['Çap','Çap','Ø'],['Yarıçap','Yarıçap','R'],['Açı','Açı','∠'],['Pah','Pah','×'],['Diş','Diş','M'],['Geçme','Geçme','H7'],['Limit ölçü','Limit ölçü','↕'],['Yüzey','Yüzey pürüzlülüğü','▽']];
+   const open=()=>{host.dataset.open='true';trigger.setAttribute('aria-expanded','true');const r=trigger.getBoundingClientRect(),w=210,left=r.right+w<=innerWidth-8?r.right-1:Math.max(8,r.left-w+1);submenu.style.left=left+'px';submenu.style.top=Math.max(8,Math.min(r.top,innerHeight-submenu.offsetHeight-8))+'px';};
+   const shut=()=>{delete host.dataset.open;trigger.setAttribute('aria-expanded','false');};
+   for(const [value,label,glyph]of options){const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String((document.getElementById('boxMeasurementType')?.value||'')===value));const i=document.createElement('span');i.className='qt-menu-icon';i.setAttribute('aria-hidden','true');i.textContent=glyph;const n=document.createElement('span');n.textContent=label;const k=document.createElement('kbd');b.append(i,n,k);b.onclick=()=>{const target=document.getElementById('boxMeasurementType');target.value=value;target.dispatchEvent(new Event('change',{bubbles:true}));close();source.click();};submenu.append(b);}
+   trigger.onclick=open;host.onpointerenter=open;host.onpointerleave=shut;
+   trigger.onkeydown=e=>{if(e.key==='ArrowRight'){e.preventDefault();open();submenu.querySelector('button')?.focus();}};
+   submenu.addEventListener('keydown',e=>{const buttons=[...submenu.querySelectorAll('button')],i=buttons.indexOf(document.activeElement);if(e.key==='ArrowLeft'){e.preventDefault();shut();trigger.focus();}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;buttons[next]?.focus();}});
+   host.append(trigger,submenu);menu.append(host);
+  }
   viewer.addEventListener('contextmenu',e=>{
    if(e.target.closest('.balloon-group,.style-legend,input,textarea,button,a'))return;
    const s=root.ASMachApp?.state;if(!s?.fileData)return;
@@ -103,7 +127,7 @@ document.addEventListener('keydown',e=>{if(root.ASMachKeyboard?.inWorkspace()||e
    e.preventDefault();e.stopImmediatePropagation();close();previousFocus=document.activeElement;menu.replaceChildren();
    heading('SEÇİM / EKLE');action('#selectModeButton','Seçim aracı','V','↖');action('#addModeButton','Balon ekle','B','⊕');action('#acuiCreateManual','Karakteristik ekle','Ctrl+Alt+C','▤');action('#acuiCreateNote','Not ekle','Ctrl+Alt+N','✎');
    heading('EKLEME ŞEKLİ');action('[data-for="boxScanMode"][data-choice="smart"]','Akıllı — doğrudan kaydet','Alt+5','✓',true);action('[data-for="boxScanMode"][data-choice="controlled"]','Kontrollü — önce düzenle','Alt+6','☑',true);
-   heading('OKUMA TÜRÜ');for(const [v,label,key,icon] of [['auto','Otomatik ayıklama','1','✧'],['dimension','Ölçü ayıkla','2','↔'],['gdt','GD&T ayıkla','3','⌖'],['note','Not OCR','4','≡']])action('[data-for="boxContentMode"][data-choice="'+v+'"]',label,'Alt+'+key,icon,true);
+   heading('OKUMA TÜRÜ');action('[data-for="boxContentMode"][data-choice="auto"]','Otomatik ayıklama','Alt+1','✧',true);measurementSubmenu();for(const [v,label,key,icon] of [['gdt','GD&T ayıkla','3','⌖'],['note','Not OCR','4','≡']])action('[data-for="boxContentMode"][data-choice="'+v+'"]',label,'Alt+'+key,icon,true);
    heading('GÖRÜNÜM');action('#extractedVisibilityButton',s.hideExtractedDetails?'Ayıklananları göster':'Ayıklananları gizle','','◉',true);
    const visibility=menu.querySelector('[data-source="#extractedVisibilityButton"]');if(visibility){visibility.setAttribute('role','menuitemcheckbox');visibility.setAttribute('aria-checked',String(!!s.hideExtractedDetails));}
    action('#zoomInButton','Yakınlaştır','','+');action('#zoomOutButton','Uzaklaştır','','−');action('#fitButton','Ekrana sığdır','','⛶');

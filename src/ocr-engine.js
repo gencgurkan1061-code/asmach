@@ -5,12 +5,48 @@
   const MAX_JOB_MS = 120000;
   let worker = null;
   let workerPromise = null;
+  let requestedModel = 'standard', loadedModel = null;
+  // A fine-tuned model is another language model inside the SAME Tesseract
+  // worker, not a second OCR engine. It is opt-in until the 100-case gate passes.
+  function modelForJob(options={}) {
+    if(options.textMode||options.gdtCell||options.gdtTolerance)return 'standard';
+    return options.model==='technical'?'technical':'standard';
+  }
   let progressHandler = null;
   let progressRange = null;
   let queue = Promise.resolve();
   let assetUrls = [];
   let libraryPromise = null;
   const pendingDeadlines = new Set();
+  // Cache only raw OCR output for immutable image data, never parsed values or
+  // manual edits. Every use still runs the current layout/standard validation.
+  const imageSources = new WeakMap(), passCache = new Map();
+  const CACHE_BYTES = 6 * 1024 * 1024;
+  let cacheBytes = 0, readMetrics = null;
+  function rawCacheKey(image, settings) {
+    const source=imageSources.get(image);
+    return source && source.length<=CACHE_BYTES/4 ? JSON.stringify(settings)+'\n'+source : null;
+  }
+  function cachedRaw(key) {
+    if(!key||!passCache.has(key))return null;
+    const item=passCache.get(key);passCache.delete(key);passCache.set(key,item);
+    if(readMetrics)readMetrics.cacheHits++;
+    return JSON.parse(item.json);
+  }
+  function rememberRaw(key,data) {
+    if(!key)return;
+    const json=JSON.stringify({text:data.text,confidence:data.confidence,blocks:data.blocks,words:data.words}),bytes=2*(key.length+json.length);
+    if(bytes>CACHE_BYTES)return;
+    if(passCache.has(key)){cacheBytes-=passCache.get(key).bytes;passCache.delete(key);}
+    while(passCache.size&&(cacheBytes+bytes>CACHE_BYTES||passCache.size>=24)){const oldest=passCache.keys().next().value;cacheBytes-=passCache.get(oldest).bytes;passCache.delete(oldest);}
+    passCache.set(key,{json,bytes});cacheBytes+=bytes;
+  }
+  async function readCanvas(engine,canvas,detail,key=null) {
+    const cached=readMetrics?.forceFresh?null:cachedRaw(key);if(cached)return cached;
+    if(readMetrics)readMetrics.enginePasses++;
+    const response=await deadline(engine.recognize(canvas,{}, {text:true,blocks:true}),MAX_JOB_MS,detail),data=response.data||{};
+    rememberRaw(key,data);return data;
+  }
 
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
   const messageOf = error => String(error && error.message || error || "Metin algılanamadı.");
@@ -49,7 +85,7 @@
     return `"use strict";\nconst __asmachLanguageUrls=${JSON.stringify(languageUrls)};\n` +
       `const __asmachFetch=self.fetch.bind(self);\n` +
       `self.fetch=function(input,options){const url=typeof input==='string'?input:input.url;` +
-      `const match=/\\/(eng|tur|deu)\\.traineddata(?:\\.gz)?(?:[?#].*)?$/.exec(url);` +
+      `const match=/\\/(eng|tur|deu|asmtech)\\.traineddata(?:\\.gz)?(?:[?#].*)?$/.exec(url);` +
       `if(match&&__asmachLanguageUrls[match[1]]){const value=__asmachLanguageUrls[match[1]];if(!/^blob:|^data:/.test(value)){const binary=atob(value);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return Promise.resolve(new Response(bytes));}return __asmachFetch(value,options);}` +
       `if(/^blob:|^data:/.test(url))return __asmachFetch(input,options);` +
       `return Promise.reject(new Error('OCR çevrimdışı paketinde bulunmayan dosya: '+url));};\n` +
@@ -88,14 +124,24 @@
   }
 
   async function ensureWorker() {
-    if (worker) return worker;
+    const languages=requestedModel==='technical'?'asmtech':'eng+tur+deu';
+    if(requestedModel==='technical'&&!root.ASMachOcrAssets?.asmtech)throw new Error('Eğitilmiş ölçü modeli bu pakette bulunmuyor. Standart OCR kullanılabilir.');
+    if (worker) {
+      if(loadedModel!==requestedModel){
+        passCache.clear();cacheBytes=0;
+        await deadline(worker.reinitialize(languages,1),45000,'OCR modeli değiştirilemedi.');
+        await worker.setParameters({preserve_interword_spaces:'1',user_defined_dpi:'360'});
+        loadedModel=requestedModel;
+      }
+      return worker;
+    }
     if (workerPromise) return workerPromise;
     workerPromise = (async () => {
       emit("OCR motoru hazırlanıyor", 0);
       const tesseract = await ensureLibrary();
       const assets = root.ASMachOcrAssets || {};
       // Decode language files within their own worker, without cross-worker blob fetches.
-      const languageUrls = {eng:assets.eng,tur:assets.tur,deu:assets.deu};
+      const languageUrls = {eng:assets.eng,tur:assets.tur,deu:assets.deu,...(assets.asmtech?{asmtech:assets.asmtech}:{})};
       if(!assets.deu)throw new Error('Almanca OCR dil paketi eksik. Uygulama paketini yeniden oluşturun.');
       // Load the core in the worker itself. A fragment on a blob:null URL cannot
       // reliably be resolved by importScripts when the standalone HTML uses file:.
@@ -104,7 +150,7 @@
       const workerSource = new root.TextDecoder().decode(workerBytes);
       const workerUrl = makeUrl(bootstrapSource(languageUrls) + coreSource + "\n;self.TesseractCore=TesseractCore;\n" + workerSource, "text/javascript");
       let abandoned = false;
-      const creation = tesseract.createWorker("eng+tur+deu", 1, {
+      const creation = tesseract.createWorker(languages, 1, {
         workerPath: workerUrl,
         workerBlobURL: false,
         corePath: "embedded-core.js",
@@ -125,6 +171,7 @@
       creation.then(created => { if (abandoned) created.terminate(); }, () => {});
       try {
         worker = await deadline(creation, 45000, "OCR 45 saniyede başlatılamadı. Metni elle girebilir veya yeniden deneyebilirsiniz.");
+        loadedModel=requestedModel;
         await deadline(worker.setParameters({ preserve_interword_spaces: "1", user_defined_dpi: "360" }), 10000, "OCR ayarları uygulanamadı.");
         return worker;
       } catch (error) {
@@ -136,10 +183,12 @@
   }
 
   async function disposeWorker() {
+    passCache.clear();cacheBytes=0;
     for (const cancel of [...pendingDeadlines]) cancel();
     const current = worker;
     worker = null;
     workerPromise = null;
+    loadedModel = null;
     if (current) { try { await current.terminate(); } catch (_) {} }
     assetUrls.forEach(url => root.URL.revokeObjectURL(url));
     assetUrls = [];
@@ -158,7 +207,7 @@
     if (snapshot && typeof snapshot !== "string" && snapshot.width && snapshot.height) return snapshot;
     return deadline(new Promise((resolve, reject) => {
       const image = new root.Image();
-      image.onload = () => resolve(image);
+      image.onload = () => {if(typeof snapshot==='string'&&/^data:image\//.test(snapshot))imageSources.set(image,snapshot);resolve(image);};
       image.onerror = () => reject(new Error("Seçilen alanın görüntüsü okunamadı."));
       image.src = snapshot;
     }), 20000, "Seçilen görüntü yüklenemedi.");
@@ -265,7 +314,7 @@
     return { text: normalize(data.text), confidence: Number(data.confidence) || 0, words, lines, source: "Yerel OCR · Türkçe / İngilizce", angle: variant.angle };
   }
 
-  function candidateScore(candidate) {
+  function candidateScore(candidate, expectedMeasurementType = '') {
     const text = normalize(candidate.text);
     if (!text) return -1000;
     let score = clamp(Number(candidate.confidence) || 0, 0, 100) * 0.45;
@@ -280,6 +329,7 @@
     if(candidate.enhancement==='strong'&&candidate.confidence<90)score-=5;
     const meaning=root.ASMachRequirements?.assessReading?.(text);
     if(meaning?.valid){score+=12;if(meaning.tolerance==='limits')score+=18;}
+    score+=root.ASMachRequirements?.measurementIntentScore?.(text,expectedMeasurementType)||0;
     if(meaning?.errors.length)score-=35;
     if(/^[ØR]?\s*0\d/.test(text))score-=18;
     if(/[+−-]\s*0\d/.test(text))score-=25;
@@ -292,6 +342,21 @@
     score -= Math.min(35, (text.match(/[^\p{L}\p{N}\s.,+\-±Ø°×/()|%:'"⏥⌖⏤⌓⊥∥]/gu) || []).length * 5);
     if (text.length > 180) score -= (text.length - 180) * 0.1;
     return score;
+  }
+
+  function plainNumericGeometry(result,rows) {
+    const text=normalize(result?.text);
+    if(!/^\d{1,8}(?:\.\d{1,6})?$/.test(text)||result.confidence<94||result.needsReview||result.alternateRawText||result.layout?.ambiguousSpacing||result.layout?.missingDigits||rows.length!==1)return false;
+    const row=rows[0],parts=row.parts.slice().sort((a,b)=>a.x-b.x),digits=(text.match(/\d/g)||[]).length;
+    if(parts.length!==text.length||parts.filter(p=>p.h>=row.h*.8).length!==digits)return false;
+    for(let i=0;i<parts.length;i++){
+      const p=parts[i];if(text[i]==='.'&&(p.h>row.h*.25||p.w>row.h*.3||p.y<row.y+row.h*.7))return false;
+      if(i&&p.x-parts[i-1].x-parts[i-1].w>row.h*.5)return false;
+    }
+    return true;
+  }
+  function uncertainLayout(layout) {
+    return layout&&(layout.ambiguousSpacing||layout.missingDigits)?{ambiguousSpacing:!!layout.ambiguousSpacing,missingDigits:layout.missingDigits||0,ambiguityReasons:[...(layout.ambiguityReasons||[])],geometryText:layout.geometryText}:null;
   }
 
   function overlapRatio(first, second) {
@@ -317,8 +382,9 @@
     try {
       await engine.setParameters({ tessedit_pageseg_mode: segmentation || (wholePage ? "11" : "6") });
       emit("Metin tanınıyor", 0, `${angle}° yön · ${thresholded ? "siyah beyaz" : "gri ton"}`);
-      const response = await deadline(engine.recognize(variant.canvas, {}, { text: true, blocks: true }), MAX_JOB_MS, "Metin tanıma süresi aşıldı. Daha küçük bir alan seçin.");
-      const result = extractResults(response.data || {}, variant, pass);
+      const key=!cellLocal&&!wholePage?rawCacheKey(image,[angle,thresholded,segmentation||'6',enhancement]):null;
+      const data=await readCanvas(engine,variant.canvas,"Metin tanıma süresi aşıldı. Daha küçük bir alan seçin.",key);
+      const result = extractResults(data, variant, pass);
       if (!wholePage && !cellLocal && root.ASMachMeasurementLayout) {
         recoverToleranceSigns(result,variant);
         const layout = root.ASMachMeasurementLayout.reconstruct(result.words, {width:variant.width,height:variant.height,ocr:true,details:true});
@@ -342,7 +408,7 @@
     for(const sign of evidence){const box=originalBox({x0:sign.x,y0:sign.y,x1:sign.x+sign.w,y1:sign.y+sign.h},variant);
       for(const word of result.words){
         if(word.symbols?.length&&word.symbols.map(s=>s.text).join('')===word.text){
-          let offset=0;for(const symbol of word.symbols){if(/^[+*£土士]$/.test(symbol.text)&&overlapRatio(symbol,box)>.6){word.text=word.text.slice(0,offset)+'±'+word.text.slice(offset+symbol.text.length);changed=true;}offset+=symbol.text.length;}
+          let offset=0;for(const symbol of word.symbols){if(/^[+*£土士]$/.test(symbol.text)&&overlapRatio(symbol,box)>.6){word.text=word.text.slice(0,offset)+'±'+word.text.slice(offset+symbol.text.length);symbol.text='±';changed=true;}offset+=symbol.text.length;}
         }
         if(overlapRatio(word,box)<.6||Math.abs(word.x-box.x)>Math.max(box.w*.5,.006))continue;
         const text=word.text.trim();if(!/^[+*£土士±]+(?:\s*(?:\d|[.,])|$)/.test(text))continue;
@@ -360,7 +426,7 @@
       spaced=root.ASMachOcrEnhancement?.spacingVariant?.(source);if(!spaced&&!prefix)return [];
       const engine=await ensureWorker(),readings=[];
       for(const mode of ['7','13']){
-        await engine.setParameters({tessedit_pageseg_mode:mode});const response=await deadline(engine.recognize(spaced?.canvas||source,{}, {text:true,blocks:true}),MAX_JOB_MS,'Aralıklı ölçü okuma süresi aşıldı.');const data=response.data||{};
+        await engine.setParameters({tessedit_pageseg_mode:mode});const data=await readCanvas(engine,spaced?.canvas||source,'Aralıklı ölçü okuma süresi aşıldı.',rawCacheKey(image,['spacing',angle,mode]));
         const shift=node=>{if(node.bbox)for(const key of ['x0','x1','y0','y1'])node.bbox[key]=(key[0]==='x'?(spaced?spaced.mapX(node.bbox[key]):node.bbox[key])+offset:(spaced?spaced.mapY(node.bbox[key]):node.bbox[key]));for(const key of ['blocks','paragraphs','lines','words','symbols'])for(const child of node[key]||[])shift(child);};shift(data);
         const result=extractResults(data,variant,'spacing-'+mode);result.rawText=result.text;result.text=root.ASMachRequirements.normalize(result.text);result.enhancement='spacing';result.source='Yerel OCR · karakter aralığı kontrollü okuma';result.needsReview=true;
         recoverToleranceSigns(result,variant);
@@ -378,7 +444,7 @@
     try{if(regions.length!==2)return null;const engine=await ensureWorker(),parts=[];
       for(const [index,box]of regions.entries()){
         const crop=makeCanvas(box.w,box.h);crop.getContext('2d').drawImage(variant.canvas,box.x,box.y,box.w,box.h,0,0,box.w,box.h);
-        try{await engine.setParameters({tessedit_pageseg_mode:index===0?'7':'6'});const response=await deadline(engine.recognize(crop,{}, {text:true,blocks:true}),MAX_JOB_MS,'Bölge okuma süresi aşıldı.');const data=response.data||{};
+        try{const singleRow=root.ASMachOcrEnhancement.measurementInkRows(crop).length===1,mode=index===0||singleRow?'7':'6';await engine.setParameters({tessedit_pageseg_mode:mode});const data=await readCanvas(engine,crop,'Bölge okuma süresi aşıldı.',rawCacheKey(image,['separated',angle,index,mode]));
           const shift=node=>{if(node.bbox)for(const k of ['x0','x1','y0','y1'])node.bbox[k]+=k[0]==='x'?box.x:box.y;for(const key of ['blocks','paragraphs','lines','words','symbols'])for(const child of node[key]||[])shift(child);};shift(data);
           const part=extractResults(data,variant,'region-'+index);recoverToleranceSigns(part,variant);parts.push(part);
         }finally{crop.width=crop.height=1;}
@@ -390,7 +456,8 @@
         if(evidence.diameter){parts[0].text='Ø';if(parts[0].words.length===1)parts[0].words[0].text='Ø';}
       }
       const words=parts.flatMap(p=>p.words),layout=root.ASMachMeasurementLayout.reconstruct(words,{width:variant.width,height:variant.height,ocr:true,details:true});
-      if(!layout?.structured||layout.missingDigits)return {text:parts.map(p=>p.text).join('\n'),rawText:parts.map(p=>p.text).join('\n'),confidence:Math.min(...parts.map(p=>p.confidence)),words,lines:[],layout,angle,source:'Yerel OCR · bölgesel kontrol',enhancement:'regions'};
+      const verifiedSign=parts.some(p=>p.visualToleranceSign)&&layout?.text&&!layout.ambiguousSpacing&&root.ASMachRequirements.assessReading(layout.text).valid;
+      if((!layout?.structured&&!verifiedSign)||layout.missingDigits)return {text:parts.map(p=>p.text).join('\n'),rawText:parts.map(p=>p.text).join('\n'),confidence:Math.min(...parts.map(p=>p.confidence)),words,lines:[],layout,angle,source:'Yerel OCR · bölgesel kontrol',enhancement:'regions',visualToleranceSign:parts.some(p=>p.visualToleranceSign),needsReview:parts.some(p=>p.needsReview)};
       return {text:layout.text,rawText:parts.map(p=>p.text).join('\n'),confidence:Math.min(...parts.map(p=>p.confidence)),words,lines:parts.flatMap(p=>p.lines),layout,angle,source:'Yerel OCR · ayrı nominal / sembol / tolerans okuması',enhancement:'regions',visualToleranceSign:parts.some(p=>p.visualToleranceSign),needsReview:parts.some(p=>p.needsReview)};
     }finally{variant.canvas.width=variant.canvas.height=1;}
   }
@@ -414,8 +481,8 @@
         const offset=prefix?crop.width-prefix.image.width:0,readingImage=prefix?.image||crop;
         const readings=[];
         try{for(const mode of ['7','13']){
-          await engine.setParameters({tessedit_pageseg_mode:mode});const response=await deadline(engine.recognize(readingImage,{}, {text:true,blocks:true}),MAX_JOB_MS,'Ölçü satırı okuma süresi aşıldı.');const data=response.data||{};
-          const shift=node=>{if(node.bbox)for(const key of ['x0','x1','y0','y1'])node.bbox[key]=(node.bbox[key]-pad+(key[0]==='x'?offset:0))/scale+(key[0]==='x'?box.x:box.y);for(const key of ['blocks','paragraphs','lines','words'])for(const child of node[key]||[])shift(child);};shift(data);const result=extractResults(data,variant,'row-'+index+'-'+mode);
+          await engine.setParameters({tessedit_pageseg_mode:mode});const data=await readCanvas(engine,readingImage,'Ölçü satırı okuma süresi aşıldı.',rawCacheKey(image,['row',angle,index,mode]));
+          const shift=node=>{if(node.bbox)for(const key of ['x0','x1','y0','y1'])node.bbox[key]=(node.bbox[key]-pad+(key[0]==='x'?offset:0))/scale+(key[0]==='x'?box.x:box.y);for(const key of ['blocks','paragraphs','lines','words','symbols'])for(const child of node[key]||[])shift(child);};shift(data);const result=extractResults(data,variant,'row-'+index+'-'+mode);
           if(prefix&&/^\d+(?:\.\d+)?$/.test(result.text.trim())){result.text=prefix.prefix+result.text.trim();result.words.unshift({text:prefix.prefix,confidence:90,angle,...originalBox({x0:box.x,y0:box.y,x1:box.x+(offset-pad)/scale,y1:box.y+box.h},variant)});}
           readings.push(result);
         }}finally{crop.width=crop.height=1;if(detectedPrefix)detectedPrefix.image.width=detectedPrefix.image.height=1;if(prefix)prefix.image.width=prefix.image.height=1;}
@@ -431,6 +498,12 @@
     }finally{variant.canvas.width=variant.canvas.height=1;if(wholePrefix)wholePrefix.image.width=wholePrefix.image.height=1;}
   }
   function recognize(snapshot, options = {}) {
+    // The secondary engine/model remain opt-in until their release performance
+    // gate is approved. Normal production calls do not load or execute them.
+    // The bundled second opinion is a small symbol classifier, not another
+    // source of numeric values. It may request review but never rewrites a
+    // measurement. Nested cell/region reads remain on their dedicated paths.
+    if(root.ASMachOcrVerifier&&!options.skipSymbolVerification&&!options.textMode&&!options.gdtCell&&!options.numericScope){const next={...options,skipSymbolVerification:true};delete next.verification;return root.ASMachOcrVerifier.recognize(snapshot,next,recognize);}
     // Comparison uses exactly the normal recognition pipeline, not a single PSM-6 pass.
     if(['off','mild','strong'].includes(options.previewPass))options={...options,enhancement:options.previewPass,diagnostics:true};
     // Dispatch outside the worker lock: individual frame cells use this same worker.
@@ -444,6 +517,8 @@
       })();
     }
     return exclusive(async () => {
+      requestedModel=modelForJob(options);
+      const started=Date.now();readMetrics={enginePasses:0,cacheHits:0,forceFresh:!!(options.forceAll||options.refresh)};
       try {
         const image = await loadImage(snapshot);
         if(['nominal','tolerance'].includes(options.numericScope)){
@@ -456,7 +531,7 @@
           const candidates=[];for(const [index,mode]of ['7','13','6'].entries())candidates.push(await runPass(image,0,false,false,'numeric-'+index,mode,false,primary));
           if(!['off','mild','strong'].includes(options.enhancement)&&!candidates.some(r=>valid(r)&&r.confidence>=90))candidates.push(await runPass(image,0,false,false,'numeric-mild','7',false,'mild'));
           candidates.push(...await readSpacedLine(image,0));
-          for(const reading of [...candidates])if(reading.alternateRawText)candidates.push({...reading,text:reading.alternateRawText,layout:null,alternateRawText:undefined});
+          for(const reading of [...candidates])if(reading.alternateRawText)candidates.push({...reading,text:reading.alternateRawText,layout:uncertainLayout(reading.layout),alternateRawText:undefined});
           for(const reading of candidates){
             const rows=String(reading.rawText||'').split(/\r?\n/).map(line=>clean(line)).filter(Boolean),signed=new RegExp('^[+-]'+numeric+'$'),zero=/^0(?:\.0+)?$/;
             if(options.numericScope==='tolerance'&&rows.length===2&&rows.some(row=>signed.test(row))&&rows.every(row=>signed.test(row)||zero.test(row))){reading.text=rows.join(' / ');reading.scopeRows=true;}
@@ -496,26 +571,38 @@
         const tall = (image.naturalHeight || image.height) > (image.naturalWidth || image.width) * 1.4;
         const angles = tall ? [90, 270, 0, 180] : [0, 180, 90, 270];
         const candidates = [];
+        const scoreCandidate=candidate=>candidateScore(candidate,options.expectedMeasurementType||'');
         for (let index = 0; index < angles.length; index++) {
           const result = await runPass(image, angles[index], false, false, index);
           candidates.push(result);
+          // Only a single, fully accounted-for numeric row may take the fast
+          // route. A second segmentation must agree before skipping recovery.
+          if(index===0&&!options.forceAll&&!options.diagnostics&&!['Pah','Diş','Geçme','Limit ölçü','Yüzey'].includes(options.expectedMeasurementType)&&(root.ASMachOcrEnhancement?.mode(options)||'off')==='auto'&&result.confidence>=94&&/^\d+(?:\.\d+)?$/.test(result.text)){
+            const proof=prepare(image,angles[index],false,false);let eligible=false;
+            try{eligible=plainNumericGeometry(result,root.ASMachOcrEnhancement.measurementInkRows(proof.canvas))&&plainNumericGeometry(result,root.ASMachOcrEnhancement.measurementInkRows(proof.canvas,245));}finally{proof.canvas.width=proof.canvas.height=1;}
+            if(eligible){const check=await runPass(image,angles[index],false,false,'verify-fast','7');candidates.push(check);const meaning=root.ASMachRequirements?.assessReading(result.text);
+              if(check.confidence>=94&&check.text===result.text&&!check.needsReview&&!check.reviewReason&&!check.layout?.ambiguousSpacing&&!check.layout?.missingDigits&&!check.alternateRawText&&meaning?.valid&&!meaning.errors.length){
+                emit('Ölçü iki okumayla doğrulandı',1);return {...result,needsReview:false,alternatives:[],measurementKind:meaning.kind,toleranceKind:meaning.tolerance,performance:{elapsedMs:Date.now()-started,enginePasses:readMetrics.enginePasses,cacheHits:readMetrics.cacheHits,fastPath:true}};
+              }
+            }
+          }
           // A plain number may be a fragment; only a confident complete technical pattern permits an early finish.
-          if (!options.forceAll && candidateScore(result) >= 114 && result.confidence >= 75) break;
+          if (!options.forceAll && scoreCandidate(result) >= 114 && result.confidence >= 75) break;
         }
-        candidates.sort((a, b) => candidateScore(b) - candidateScore(a));
+        candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
         const bestAngle = candidates[0] ? candidates[0].angle : 0;
-        if (options.forceAll || !candidates[0] || candidateScore(candidates[0]) < 112) candidates.push(await runPass(image, bestAngle, true, false, 5));
+        if (options.forceAll || !candidates[0] || scoreCandidate(candidates[0]) < 112) candidates.push(await runPass(image, bestAngle, true, false, 5));
         // Raw-line segmentation bypasses word-spacing assumptions for condensed,
         // monospaced and technical lettering. Keep stacked tolerances in block mode.
         const ratio=(image.naturalWidth||image.width)/(image.naturalHeight||image.height);
         const lineRatio=bestAngle===90||bestAngle===270?1/ratio:ratio;
         if(lineRatio>4&&(options.forceAll||candidates[0].confidence<85))candidates.push(await runPass(image,bestAngle,false,false,6,'13'));
-        candidates.sort((a, b) => candidateScore(b) - candidateScore(a));
+        candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
         const enhancement=root.ASMachOcrEnhancement?.mode(options)||'off';
         // Geometry-first row reads must not inherit a mistaken whole-block angle.
         // Rotations with no separate text rows exit before invoking the OCR worker.
         for(const angle of angles){const separated=await readMeasurementRows(image,angle);if(separated)candidates.push(separated);}
-        candidates.sort((a,b)=>candidateScore(b)-candidateScore(a));
+        candidates.sort((a,b)=>scoreCandidate(b)-scoreCandidate(a));
         if(enhancement!=='off'){
           const passes=enhancement==='auto'?['mild','strong']:[enhancement];
           // A bad whole-block read must not lock every recovery pass to the wrong orientation.
@@ -524,42 +611,49 @@
             for(const strength of passes)candidates.push(await runPass(image,angle,false,false,'enhanced-'+angle+'-'+strength,'6',false,strength));
             const separated=await readSeparated(image,angle);if(separated)candidates.push(separated);
           }
-          candidates.sort((a,b)=>candidateScore(b)-candidateScore(a));
+          candidates.sort((a,b)=>scoreCandidate(b)-scoreCandidate(a));
         }
         // Repeated glyph spacing gets its own reversible reading copy. Original
         // coordinates and every original reading remain available for review.
         for(const angle of [...new Set([angles[0],bestAngle])])candidates.push(...await readSpacedLine(image,angle));
-        for(const result of [...candidates])if(result.alternateRawText)candidates.push({...result,text:result.alternateRawText,layout:result.layout?.ambiguousSpacing?{ambiguousSpacing:true}:null,alternateRawText:undefined,source:result.source+' · ham okuma',needsReview:true});
-        candidates.sort((a,b)=>candidateScore(b)-candidateScore(a));
+        for(const result of [...candidates])if(result.alternateRawText)candidates.push({...result,text:result.alternateRawText,layout:uncertainLayout(result.layout),alternateRawText:undefined,source:result.source+' · ham okuma',needsReview:true});
+        candidates.sort((a,b)=>scoreCandidate(b)-scoreCandidate(a));
         // Shared by normal recognition and all three comparison variants.
         if(root.ASMachDiameterVision?.recover){
           const W=image.naturalWidth||image.width,H=image.naturalHeight||image.height,k=Math.min(1,1200/Math.max(W,H)),source=makeCanvas(Math.round(W*k),Math.round(H*k));source.getContext('2d').drawImage(image,0,0,source.width,source.height);
-          try{const evidence={...root.ASMachDiameterVision.detect(source),width:W,height:H};for(let i=0;i<candidates.length;i++)candidates[i]=root.ASMachDiameterVision.recover(candidates[i],evidence);candidates.sort((a,b)=>candidateScore(b)-candidateScore(a));}catch{/* Keep OCR readings if optional visual inspection fails. */}finally{source.width=source.height=1;}
+          try{const evidence={...root.ASMachDiameterVision.detect(source),width:W,height:H};for(let i=0;i<candidates.length;i++)candidates[i]=root.ASMachDiameterVision.recover(candidates[i],evidence);candidates.sort((a,b)=>scoreCandidate(b)-scoreCandidate(a));}catch{/* Keep OCR readings if optional visual inspection fails. */}finally{source.width=source.height=1;}
         }
         const best = candidates[0] || { text: "", confidence: 0, words: [], lines: [] };
         const meaning=root.ASMachRequirements?.assessReading?.(best.text);
         if(meaning){
           best.measurementKind=meaning.kind;best.toleranceKind=meaning.tolerance;
-          const conflict=meaning.valid&&candidates.some(other=>other!==best&&other.confidence>=60&&candidateScore(other)>=candidateScore(best)-12&&(()=>{const next=root.ASMachRequirements.assessReading(other.text);return next.valid&&next.signature!==meaning.signature;})());
-          if(conflict||meaning.errors.length){best.needsReview=true;best.reviewReason=conflict?'Yakın güçteki okumalar ölçü türü, nominal veya tolerans konusunda uyuşmuyor. Kaynakla karşılaştırın.':meaning.errors.join(' · ');}
+          const conflict=meaning.valid&&(root.ASMachOcrEnhancement?.compare?root.ASMachOcrEnhancement.compare(candidates,best):candidates.some(other=>other!==best&&other.confidence>=60&&scoreCandidate(other)>=scoreCandidate(best)-12&&(()=>{const next=root.ASMachRequirements.assessReading(other.text);return next.valid&&next.signature!==meaning.signature;})()));
+          if(conflict||meaning.errors.length||!meaning.valid){best.needsReview=true;best.reviewReason=conflict?'Yakın güçteki okumalar ölçü türü, nominal veya tolerans konusunda uyuşmuyor. Kaynakla karşılaştırın.':meaning.errors.join(' · ')||'Okuma geçerli bir ölçü olarak doğrulanamadı. Kaynak görüntüyü kontrol edin.';}
         }
-        if(root.ASMachOcrEnhancement&&(enhancement!=='off'||!root.ASMachApp?.state.pdfDoc)&&(root.ASMachOcrEnhancement.compare(candidates,best)||best.layout?.missingDigits||best.layout?.ambiguousSpacing||/^[ØR]?\s*0\d/.test(best.text))){best.needsReview=true;best.confidence=Math.min(best.confidence,45);best.reviewReason='Okumalar farklı veya rakam yerleşimi şüpheli. Nominal ve toleransları kaynak görüntüyle karşılaştırın.';}
-        if(best.layout?.missingDigits||best.layout?.ambiguousSpacing){best.needsReview=true;best.confidence=Math.min(best.confidence,45);best.reviewReason='Karakter aralıkları belirsiz veya okuma rakam kaybediyor. Kaynak görüntüyü kontrol edin.';}
+        const readingsAgree=root.ASMachOcrEnhancement?.agrees?.(candidates,best)===true;
+        const hardGeometry=(best.layout?.ambiguityReasons||[]).some(reason=>['unattached_mark','ambiguous_mark_row','inverted_deviation_rows','separate_numeric_words'].includes(reason));
+        const suspiciousLayout=hardGeometry||((best.layout?.missingDigits||best.layout?.ambiguousSpacing)&&!readingsAgree);
+        if(root.ASMachOcrEnhancement&&(enhancement!=='off'||!root.ASMachApp?.state.pdfDoc)&&(root.ASMachOcrEnhancement.compare(candidates,best)||suspiciousLayout||/^[ØR]?\s*0\d/.test(best.text))){best.needsReview=true;best.confidence=Math.min(best.confidence,45);best.reviewReason='Okumalar farklı veya rakam yerleşimi şüpheli. Nominal ve toleransları kaynak görüntüyle karşılaştırın.';}
+        if(suspiciousLayout){best.needsReview=true;best.confidence=Math.min(best.confidence,45);best.reviewReason='Karakter aralıkları belirsiz veya okuma rakam kaybediyor. Kaynak görüntüyü kontrol edin.';}
         if(enhancement!=='off')root.ASMachOcrEnhancement.report(best);
         emit("Metin tanıma tamamlandı", 1);
         const alternatives=candidates.filter((candidate,index,all)=>candidate.text&&candidate.text!==best.text&&all.findIndex(other=>other.text===candidate.text)===index).slice(0,5).map(candidate=>({text:candidate.text,confidence:candidate.confidence,angle:candidate.angle,enhancement:candidate.enhancement}));
         const result={...best,alternatives};
+        result.performance={elapsedMs:Date.now()-started,enginePasses:readMetrics.enginePasses,cacheHits:readMetrics.cacheHits};
         if(options.diagnostics&&root.ASMachOcrEnhancement)result.previewImage=root.ASMachOcrEnhancement.diagnostic(image,result);
         return result;
       } catch (error) {
         await disposeWorker();
         return { text: "", confidence: 0, words: [], lines: [], source: "Yerel OCR", error: messageOf(error) };
-      }
+      } finally {readMetrics=null;}
     }, options.onProgress);
   }
 
   function detect(snapshot, options = {}) {
     return exclusive(async () => {
+      // Page-wide discovery can include prose, datums and GD&T. Never inherit
+      // a previous crop's specialized model implicitly.
+      requestedModel='standard';
       try {
         if(options.shouldCancel?.())return{words:[],lines:[],cancelled:true};
         progressRange={start:0,span:.08,detail:'OCR hazırlanıyor'};
@@ -633,5 +727,5 @@
   }
 
   root.ASMachOCR = Object.freeze({ recognize, detect, capture, terminate: disposeWorker,
-    _test: Object.freeze({ normalize, candidateScore, originalBox, mergeRegions, otsuThreshold, bytesFromBase64, bootstrapSource }) });
+    _test: Object.freeze({ normalize, candidateScore, originalBox, mergeRegions, otsuThreshold, bytesFromBase64, plainNumericGeometry, modelForJob, bootstrapSource, cachedRaw, rememberRaw, cacheState:()=>({entries:passCache.size,bytes:cacheBytes,limit:CACHE_BYTES}) }) });
 })(typeof window !== "undefined" ? window : globalThis);

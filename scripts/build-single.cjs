@@ -14,6 +14,9 @@ const assets = {
   deu: 'ocr/lang/deu.traineddata.gz'
 };
 const registry = Object.fromEntries(Object.entries(assets).map(([key, name]) => [key, read(name).toString('base64')]));
+const glyphModel = JSON.parse(read('ocr/experimental-model/technical-glyph-v1.json').toString('utf8'));
+const technicalModel = require('./load-validated-ocr-model.cjs')(root);
+if (technicalModel) registry.eng = technicalModel.base64;
 const guideDir = path.join(root, 'outputs', 'usage-guide');
 const guideScreenshots = {};
 if (fs.existsSync(guideDir)) for (const file of fs.readdirSync(guideDir)) {
@@ -21,6 +24,7 @@ if (fs.existsSync(guideDir)) for (const file of fs.readdirSync(guideDir)) {
   if (match) guideScreenshots[match[1]] = 'data:image/png;base64,' + fs.readFileSync(path.join(guideDir, file)).toString('base64');
 }
 const modules = ['requirements-engine', 'measurement-layout', 'zone-engine', 'ocr-engine', 'ocr-image-enhancement', 'diameter-vision', 'gdt-vision', 'gdt-report', 'auto-selection', 'balloon-placement', 'balloon-appearance', 'appearance-settings', 'snapshot-tools', 'automatic-geometry', 'automatic-symbols', 'candidate-preview', 'pdf-preview', 'fai-template', 'excel-reports', 'inspection-plan', 'bulk-plan', 'ocr-review-controls', 'characteristic-dock', 'inspector-panel', 'characteristic-ui', 'dimension-filter', 'workflow', 'workspace-layout'];
+modules.unshift('technical-glyph-model','ocr-verifier');
 modules.unshift('number-order','message-dialog');
 modules.push('report-delivery','report-workbench');
 modules.splice(modules.indexOf('characteristic-ui'),0,'characteristic-region');
@@ -78,6 +82,8 @@ const scripts = modules.map(name => {
   return `<script id="asmach-${name}">\n${code.replace(/<\/script/gi, '<\\/script')}\n</script>`;
 });
 scripts.unshift(`<script>window.ASMachBuildVersion=${JSON.stringify(JSON.parse(read('package.json').toString('utf8')).version)};</script>`);
+scripts.unshift(`<script>window.ASMachGlyphModel=${JSON.stringify(glyphModel)};</script>`);
+if (technicalModel) scripts.unshift(`<script>window.ASMachOcrModelInfo=${JSON.stringify(technicalModel.metadata)};</script>`);
 scripts.unshift(`<script>window.ASMachGuideScreenshots=${JSON.stringify(guideScreenshots)};</script>`);
 scripts.unshift(`<script>window.ASMachOcrIcons=${JSON.stringify(Object.fromEntries(['nominal','tolerance','compare','original','strong','text'].map(k=>[k,'data:image/svg+xml;base64,'+read('src/assets/ocr-'+k+'.svg').toString('base64')])))};</script>`);
 scripts.unshift(`<script>window.ASMachEditIcons=${JSON.stringify(Object.fromEntries(['balloon','brush','list','settings','license','about','help','template'].map(k=>[k,'data:image/svg+xml;base64,'+read('src/assets/ribbon-'+k+'.svg').toString('base64')])))};</script>`);

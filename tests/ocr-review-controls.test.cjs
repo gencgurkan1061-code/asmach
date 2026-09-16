@@ -2,9 +2,10 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function fixture(){
   const nodes={};
   class Node{
-    constructor(){this.value='';this.children=[];this.dataset={};this.hidden=false;}
+    constructor(){this.value='';this.children=[];this.dataset={};this.style={};this.hidden=false;}
     set id(v){this._id=v;nodes[v]=this;}get id(){return this._id;}
     append(n){n.parent=this;this.children.push(n);}replaceChildren(...n){this.children=[];n.forEach(c=>this.append(c));}
+    after(n){n.parent=this.parent||null;}
     closest(){return this.parent||(this.parent=new Node());}
   }
   const document={getElementById:id=>nodes[id],createElement:()=>new Node(),querySelector:s=>nodes[s]||(nodes[s]=new Node())};
@@ -33,7 +34,7 @@ test('Inline method and frequency controls preserve explicit choices, show inter
   nodes.ocrFrequencyNote.value='Her kurulumda';assert.equal(c.window.ASMachInspectionPlan.validate(api.frequency()),'');
 });
 test('Structured extras remain editable and nonnumeric records cannot save stale dimensional tolerances',()=>{
-  const {api,nodes,pending,changes}=fixture();api.render({type:'Diş',threadPitch:'1.5'});nodes.ocrExtra_threadPitch.value='2';nodes.ocrExtra_threadPitch.oninput();assert.equal(pending.structuredEdits.threadPitch,'2');assert.equal(changes(),1);
+  const {api,nodes,pending,changes}=fixture();api.render({type:'Diş',threadPitch:'1.5'});pending.requirementMode='manual';nodes.ocrExtra_threadPitch.value='2';nodes.ocrExtra_threadPitch.oninput();assert.equal(pending.structuredEdits.threadPitch,'2');assert.equal(pending.requirementMode,'auto');assert.equal(changes(),1);
   const saved=api.sanitize({type:'Proses',nominalValue:'50',lowerTolerance:'-0.1',upperTolerance:'0.1',unit:'mm',toleranceStandard:'ISO',requirement:'Markalama yapılmalıdır.'});assert.equal(saved.nominalValue,'');assert.equal(saved.unit,'');assert.equal(saved.toleranceStandard,'');assert.equal(saved.requirement,'Markalama yapılmalıdır.');
   const gdt=api.sanitize({type:'GD&T',nominalValue:'87.5',lowerTolerance:'-0.2',upperTolerance:'0.2'});assert.equal(gdt.nominalValue,'');assert.equal(gdt.lowerTolerance,'0');
 });

@@ -2,9 +2,9 @@
 (function(root){
  'use strict';
  let app,form,source,ocr,ocrMessage,numberMessage,planHost,planSummary,planEditor,planUi;
- let recordStamp='',documentKey=null,revision=0,sourceEditor;const pages=new Map();
+ let recordStamp='',documentKey=null,revision=0,sourceEditor,rotationFocusId=null;const pages=new Map();
  const $=id=>document.getElementById(id),clone=x=>JSON.parse(JSON.stringify(x));
- const measureKeys=['type','nominalValue','nominalSource','limitDimension','decimalPlaces','unit','lowerTolerance','upperTolerance','lowerLimit','upperLimit','toleranceStandard','toleranceExplicit','toleranceAmbiguous','parseWarnings','fitClass','threadClass','threadPitch','gdtSubtype','gdtFrame','datumRefs','referenceLength','specialDesignator','quantity','evaluationMethod','callout'];
+ const measureKeys=['type','nominalValue','nominalSource','limitDimension','decimalPlaces','unit','lowerTolerance','upperTolerance','lowerLimit','upperLimit','toleranceStandard','toleranceExplicit','toleranceAmbiguous','parseWarnings','fitClass','threadClass','threadPitch','threadStandard','gdtSubtype','gdtFrame','datumRefs','referenceLength','specialDesignator','surfaceTexture','measurementEvidence','quantity','evaluationMethod','callout'];
  function node(tag,cls,text){const n=document.createElement(tag);n.className=cls||'';if(text)n.textContent=text;return n;}
  function button(host,id,text,action){const b=node('button','btn',text);b.id=id;b.type='button';b.onclick=action;host.append(b);return b;}
  function init(bridge){
@@ -70,6 +70,7 @@
   const text=String(edit.text||'').trim();if(!text)throw Error('Algılanan metin boş olamaz.');
   const parsed=app.parseRequirement(text);
   if(parsed.toleranceAmbiguous)throw Error(parsed.parseWarnings.join(' '));
+  if(root.ASMachRequirements.fieldProfile(r.type).numeric&&!root.ASMachRequirements.fieldProfile(parsed.type).numeric)throw Error('Ölçü metni doğrulanamadı. Metinsel bir karakteristik girmek için önce uygun türü seçin.');
   if(root.ASMachRequirements.fieldProfile(parsed.type).numeric&&![parsed.nominalValue,parsed.upperTolerance,parsed.lowerLimit,parsed.upperLimit].some(v=>v!=null&&String(v).trim()))throw Error('Ölçü metni doğrulanamadı. Nominal, tolerans veya limitleri kontrol edin.');
   let next={...r,...Object.fromEntries(measureKeys.map(k=>[k,parsed[k]??(['toleranceExplicit','toleranceAmbiguous'].includes(k)?false:k==='parseWarnings'?[]:'')])),ocrText:text,recognitionSource:edit.source||'Elle düzeltilen OCR',detectionConfidence:edit.confidence||0,result:'',resultStatus:'pending',status:'needs_review'};
   Object.assign(next,{originalOcrText:r.originalOcrText||edit.rawText||r.ocrText||text,ocrNeedsReview:edit.needsReview===true,ocrReviewReason:edit.needsReview?String(edit.reviewReason||'OCR sonucunu kaynak görüntü ile kontrol edin.'):''});
@@ -131,8 +132,8 @@
   // The crop is measured on a 360-DPI detail image, while sourceTextHeight is
   // the nominal glyph height in page pixels. Preserve that nominal measurement:
   // crop padding, tolerances and preview resolution must not resize the balloon.
-  const page=pages.get(r.page),canvas=app.elements?.sourceCanvas;root.ASMachBalloonPlacement?.autoStyle(next,page?.width||canvas?.width||1,page?.height||canvas?.height||1);
-  app.checkpoint();Object.assign(r,app.normalizeAnnotation(next));app.state.inlineReselectionId=null;app.recordChange('Karakteristik kaynak kutusu kırpıldı',r);recordStamp='';app.renderAll();app.toast('Aday ayrıntısı seçilen alana kırpıldı; ölçü ve kontrol bilgileri korundu.');
+  const page=pages.get(r.page),canvas=app.elements?.sourceCanvas;if(!edit.rotationOnly)root.ASMachBalloonPlacement?.autoStyle(next,page?.width||canvas?.width||1,page?.height||canvas?.height||1);
+  app.checkpoint();Object.assign(r,app.normalizeAnnotation(next));app.state.inlineReselectionId=null;app.state.sourceRotationPreview=null;app.recordChange(edit.rotationOnly?'Karakteristik kutusunun açısı düzeltildi':'Karakteristik kaynak kutusu kırpıldı',r);recordStamp='';app.renderAll();app.toast(edit.rotationOnly?'Kutu ve OCR görüntüsü aynı açıya getirildi; ölçü değerleri korundu.':'Aday ayrıntısı seçilen alana kırpıldı; ölçü ve kontrol bilgileri korundu.');
  }
  async function highResolutionDetail(r,box){
   if(!app.captureExact)return'';const captured=await app.captureExact(box,r.page);if(!box.points?.length||!app.loadImage||!root.ASMachSnapshots?._test?.extract)return captured;
@@ -147,7 +148,11 @@
   try{
    if(!pages.has(r.page)){const canvas=document.createElement('canvas');if(app.state.pdfDoc){const page=await app.state.pdfDoc.getPage(r.page),v=page.getViewport({scale:1.5});canvas.width=v.width;canvas.height=v.height;await page.render({canvasContext:canvas.getContext('2d'),viewport:v}).promise;}else{canvas.width=app.elements.sourceCanvas.width;canvas.height=app.elements.sourceCanvas.height;canvas.getContext('2d').drawImage(app.elements.sourceCanvas,0,0);}if(!current())return;pages.set(r.page,canvas);}
    if(!current())return;const box=r.selectionBox||{x:Math.max(0,Math.min(.94,r.anchorX-.03)),y:Math.max(0,Math.min(.96,r.anchorY-.02)),w:.06,h:.04};let detailSnapshot='';try{detailSnapshot=await highResolutionDetail(r,box);}catch{/* Cached page crop remains available as a safe fallback. */}if(!current())return;const candidate={page:r.page,box,parsed:r,text:r.ocrText||r.requirement,pageImage:pages.get(r.page),snapshot:r.snapshot,detailSnapshot};source.replaceChildren();
-   sourceEditor=root.ASMachCandidateSource.mount(source,{candidate,candidates:[candidate],isCurrent:current,parse:text=>app.parseRequirement(text,undefined,r.type==='Not'?'Not':''),onSelectionChange:selecting=>{if(selecting&&current())app.state.inlineReselectionId=r.id;else if(app.state.inlineReselectionId===r.id)app.state.inlineReselectionId=null;app.renderOverlay();},recognize:async edit=>{const result=await root.ASMachCandidateCorrection.recognize(app,candidate,edit);if(!current())throw Error('Kayıt veya belge değişti; sonuç uygulanmadı.');return result;},applyPartial:edit=>{if(!current())throw Error('Kayıt değişti.');applyPartial(r,edit);},crop:edit=>{if(!current())throw Error('Kayıt değişti.');applyCrop(r,edit);},apply:edit=>{if(!current())throw Error('Kayıt değişti.');applyReading(r,edit,true);}});
+   sourceEditor=root.ASMachCandidateSource.mount(source,{candidate,candidates:[candidate],isCurrent:current,parse:text=>app.parseRequirement(text,undefined,r.type==='Not'?'Not':''),
+    previewRotation:box=>{if(box&&!current())return;if(!box&&app.state.sourceRotationPreview?.id!==r.id)return;app.state.sourceRotationPreview=box?{id:r.id,box}:null;app.renderOverlay();},
+    rotate:async edit=>{if(!current())throw Error('Kayıt değişti.');const refocus=source.querySelector('.wf-source-rotation input')===document.activeElement;const snapshot=await highResolutionDetail(r,edit.box);if(!current())throw Error('Kayıt veya belge değişti; açı uygulanmadı.');if(refocus)rotationFocusId=r.id;applyCrop(r,{...edit,snapshot:snapshot||edit.snapshot});},
+    onSelectionChange:selecting=>{if(selecting&&current())app.state.inlineReselectionId=r.id;else if(app.state.inlineReselectionId===r.id)app.state.inlineReselectionId=null;app.renderOverlay();},recognize:async edit=>{const result=await root.ASMachCandidateCorrection.recognize(app,candidate,edit);if(!current())throw Error('Kayıt veya belge değişti; sonuç uygulanmadı.');return result;},applyPartial:edit=>{if(!current())throw Error('Kayıt değişti.');applyPartial(r,edit);},crop:edit=>{if(!current())throw Error('Kayıt değişti.');applyCrop(r,edit);},apply:edit=>{if(!current())throw Error('Kayıt değişti.');applyReading(r,edit,true);}});
+   if(rotationFocusId===r.id){rotationFocusId=null;source.querySelector('.wf-source-rotation input')?.focus({preventScroll:true});}
   }catch(e){if(current())source.textContent='Kaynak görüntü açılamadı: '+e.message;}
  }
  root.ASMachCharacteristicInspector={init,update,applyReading,applyPartial,applyCrop,partialPatch,cancelSource:()=>sourceEditor?.cancel()};

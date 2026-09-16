@@ -90,3 +90,15 @@ test('Configured text padding expands the detected characteristic box equally on
   assert.ok(tight.textHeight>10);
   assert.ok(Math.abs(padded.textHeight-tight.textHeight)<.01,'Padding must not change detected drawing text height');
 });
+
+test('103 with sparse leading 1 and stacked +0.05 / 0 does not tilt towards the tolerance',()=>{
+ for(const font of ['Arial','Times New Roman','Consolas'])for(const angle of [0,-15,27,90]){
+  const source=createCanvas(600,400),g=source.getContext('2d');g.fillStyle='white';g.fillRect(0,0,600,400);g.translate(300,200);g.rotate(angle*Math.PI/180);g.fillStyle='blue';g.font='46px '+font;g.fillText('1 0 3',-120,16);g.font='28px '+font;g.fillText('+0.05',42,-17);g.fillText('0',42,42);g.strokeStyle='blue';g.lineWidth=2;g.beginPath();g.moveTo(-180,50);g.lineTo(190,50);g.stroke();
+  const seed={cx:300,cy:200,w:510,h:370,angle:0},r=c.window.ASMachAutoSelection.detect(source,seed);assert.ok(r.confident);assert.ok(Math.abs(((r.rect.angle-angle+270)%180)-90)<2.5,`${font}, ${angle}: ${r.rect.angle}`);assert.ok(r.rect.h<110,'Nearby dimension line excluded');
+  if(angle===0){const corrected=c.window.ASMachAutoSelection.detect(source,seed,{angleHint:-8});assert.ok(Math.abs(corrected.rect.angle)<2.5,`${font}: incorrect PDF angle retained: ${corrected.rect.angle}`);}
+ }
+});
+
+test('Explicitly locked angle wins over automatic glyph orientation',()=>{
+ const {source,seed}=fixture(30),r=c.window.ASMachAutoSelection.detect(source,seed,{angleHint:0,lockAngle:true});assert.equal(r.rect.angle,0);
+});

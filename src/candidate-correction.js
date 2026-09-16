@@ -64,7 +64,7 @@
     const hint=words.filter(w=>inside(w)&&/\d/.test(w.text)).sort((a,b)=>b.text.length-a.text.length)[0];
     const angleHint=Number.isFinite(hint?.angle)?hint.angle*180/Math.PI:undefined;
     let detected=null,snapshot=edit.snapshot,resultBox=box;
-    if(root.ASMachAutoSelection){try{detected=await root.ASMachAutoSelection.inspect(source,initial,{angleHint});}catch{}}
+    if(!box.angleLocked&&root.ASMachAutoSelection){try{detected=await root.ASMachAutoSelection.inspect(source,initial,{angleHint});}catch{}}
     if(detected)snapshot=detected.snapshot;
     else{
       const raw=await app.captureExact(box,candidate.page),image=await app.loadImage(raw),canvas=document.createElement('canvas');canvas.width=image.naturalWidth||image.width;canvas.height=image.naturalHeight||image.height;canvas.getContext('2d').drawImage(image,0,0);
@@ -75,7 +75,7 @@
     if(detected?.frame||!app.isReliableTechnicalText(pdfText)||app.parseRequirement(pdfText).type==='Uzunluk'){
       const result=await app.recognizeSnapshotAutomatically(snapshot,{enhancement:edit.enhancement});
       if(result.text)readings.push(result);else failure=result.error||'Seçilen kutuda ölçü okunamadı.';
-      if(!detected?.frame&&!Number.isFinite(angleHint)&&Number.isFinite(result.angle)&&result.confidence>=65&&root.ASMachAutoSelection){
+      if(!box.angleLocked&&!detected?.frame&&!Number.isFinite(angleHint)&&Number.isFinite(result.angle)&&result.confidence>=65&&root.ASMachAutoSelection){
         try{detected=await root.ASMachAutoSelection.inspect(source,initial,{angleHint:(detected?.rect.angle||0)-result.angle});snapshot=detected.snapshot;}catch{}
       }
     }

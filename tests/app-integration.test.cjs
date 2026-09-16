@@ -32,6 +32,7 @@ function hostContext() {
     state: { generalTolerance: { standard: "", lower: "", upper: "", unit: "mm" }, methodStyles: {} },
     clamp: (value, low, high) => Math.max(low, Math.min(high, value)) });
   vm.runInContext(requirementsSource, context);
+  vm.runInContext(fs.readFileSync(path.join(root,'src/characteristic-editing.js'),'utf8'),context);
   context.updateOcrGdtReport=()=>{};
   const methodStart = mainScript.indexOf("const InspectionMethod =");
   const methodEnd = mainScript.indexOf("let inspectionMethods =", methodStart);
@@ -47,6 +48,7 @@ function hostContext() {
   assert.ok(parserStart >= 0 && parserEnd > parserStart);
   vm.runInContext(mainScript.slice(parserStart, parserEnd), context);
   vm.runInContext(hostFunction("parseTechnicalRequirement"), context);
+  vm.runInContext(hostFunction("ocrRequirementRecord"), context);
   return context;
 }
 
@@ -129,7 +131,7 @@ test('OCR generated requirement preview keeps manual draft separate and project 
   const context=hostContext(),nodes={};
   for(const id of ['ocrRequirement','ocrRequirementHint'])nodes['#'+id]={value:'',textContent:''};
   context.document={querySelector:id=>nodes[id]};
-  context.elements={ocrCharacteristicType:{value:'Çap'},ocrNominal:{value:'50'},ocrLowerTolerance:{value:'-0.096'},ocrUpperTolerance:{value:'-0.08'},ocrUnit:{value:'mm'}};
+  context.elements={ocrCharacteristicType:{value:'Çap'},ocrNominal:{value:'50'},ocrLowerTolerance:{value:'-0.096'},ocrUpperTolerance:{value:'-0.08'},ocrUnit:{value:'mm'},ocrRecognizedText:{value:'Ø5 0 d6'}};
   const parsed=context.parseTechnicalRequirement('Ø50 d6');
   context.state.pendingRecognition={requirementParsed:parsed,requirementDraft:'Ø5 0 d6'};
   for(const name of ['updateOcrRequirement','recalculateAnnotationLimits'])vm.runInContext(hostFunction(name),context);
@@ -266,12 +268,12 @@ test('Canvas drag selects only enclosed current-page balloons; Ctrl click toggle
 });
 
 test('Editing review reopens saved rotated crop and values without OCR, and cancel leaves the original untouched',async()=>{
-  const c=hostContext(),nodes={};c.document={querySelector:s=>nodes[s]||(nodes[s]={value:'',focus(){},removeAttribute(){}})};
+  const c=hostContext(),nodes={};c.Option=function(label,value){this.label=label;this.value=value;};c.document={createElement:()=>({}),querySelector:s=>nodes[s]||(nodes[s]={value:'',options:[],add(option){this.options.push(option);},append(option){this.options.push(option);},focus(){},removeAttribute(){}})};
   const original=c.normalizeAnnotation({id:'keep',number:'11',type:'Yarıçap',ocrText:'R35',nominalValue:'35',lowerTolerance:'-0.3',upperTolerance:'0.3',requirement:'Elle düzeltilmiş not',requirementMode:'manual',inspectionMethod:'CMM',inspectionFrequency:'EVERY_N_PIECES',frequencyInterval:'10',size:32,fontSize:13,selectionBox:{x:.3,y:.3,w:.1,h:.2,points:[{x:.3,y:.3},{x:.4,y:.35},{x:.38,y:.45},{x:.28,y:.4}]},snapshot:'original-crop',bubbleX:.24,bubbleY:.36});
   const before=JSON.stringify(original);c.state.annotations=[original];c.state.currentPage=1;c.state.textBoxes=[];let detected,parsed,initial,ocrCalls=0;
   c.elements={sourceCanvas:{width:1000,height:600},ocrGeneralTolerance:{value:''},ocrSnapshotImage:{},ocrRecognizedText:{value:''},ocrRetryButton:{},ocrReviewConfirmButton:{},ocrReviewModal:{classList:{add(){},remove(){}}}};
   Object.assign(c,{normalizeRecognitionBox:b=>b,showBusy(){},hideBusy(){},captureRecognitionSnapshot:async()=> 'padded-original',loadImage:async()=>({width:600,height:400}),recognizeSnapshotAutomatically:()=>{ocrCalls++;throw Error('Must not rerun OCR');},detectGeneralToleranceStandard:()=>'',selectedAnnotation:()=>original,applyParsedOcrFields:p=>parsed=p,renderOverlay(){},toast(){}});
-  c.window.ASMachOcrReviewControls={start:opts=>initial=opts.initial};c.window.ASMachBalloonPlacement={inkSampler:()=>null};
+  c.window.ASMachOcrReviewControls={start:opts=>initial=opts.initial};vm.runInContext(fs.readFileSync(path.join(root,'src/balloon-placement.js'),'utf8'),c);c.window.ASMachBalloonPlacement={...c.window.ASMachBalloonPlacement,inkSampler:()=>null};
   c.window.ASMachSnapshots={_test:{corners:r=>{const a=r.angle*Math.PI/180;return[[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y])=>({x:r.cx+x*r.w/2*Math.cos(a)-y*r.h/2*Math.sin(a),y:r.cy+x*r.w/2*Math.sin(a)+y*r.h/2*Math.cos(a)}));}},mount:(container,image,save,error,opts)=>{detected=opts.detected;return{dispose(){},refresh(){}};}};
   for(const name of ['snapshotSourceBox','mapSnapshotSelection','savedReviewSelection','finishBoxRecognition','cancelOcrReview','parseOcrRequirement'])vm.runInContext(hostFunction(name),c);
   await c.finishBoxRecognition(original.selectionBox,original);assert.equal(ocrCalls,0);assert.ok(Math.abs(detected.rect.angle)>1);assert.equal(parsed.requirement,'Elle düzeltilmiş not');assert.equal(initial.frequencyInterval,'10');assert.equal(c.state.pendingRecognition.editingId,'keep');assert.equal(c.elements.ocrReviewConfirmButton.textContent,'Değişiklikleri kaydet');assert.equal(JSON.stringify(original),before);
@@ -516,6 +518,37 @@ test("General tolerances respect explicit values, characteristic type and angula
   assert.equal(c.parseTechnicalRequirement('45°','ISO 2768-mK','',25).upperTolerance,'+0.5');
   assert.equal(c.parseTechnicalRequirement('45° ±0.1°','ISO 2768-mK','',25).upperTolerance,'0.1');
   assert.equal(c.parseTechnicalRequirement('M6x1-6H','ISO 2768-mK').upperTolerance,'');
+});
+
+test('ASME drawing-defined deviations preserve units and explicit/pipe requirements',()=>{
+ const c=hostContext(),standard='ASME Y14.5-2018';
+ c.state.generalTolerance={standard,unit:'in',lower:'-0.002',upper:'0.003'};
+ const r=c.parseTechnicalRequirement('0.5 in',standard);
+ assert.equal(r.lowerLimit,'0.498');assert.equal(r.upperLimit,'0.503');assert.ok(r.toleranceStandard.startsWith(standard));
+ assert.equal(c.parseTechnicalRequirement('0.5 ±0.001 in',standard).upperTolerance,'+0.001');
+ assert.equal(c.parseTechnicalRequirement('1/8-27 NPT',standard).upperTolerance,'');
+ assert.equal(c.parseTechnicalRequirement('12 mm',standard).upperTolerance,'');
+ assert.equal(c.parseTechnicalRequirement('45°',standard).upperTolerance,'');
+ c.state.generalTolerance={standard,unit:'in',lower:'',upper:''};
+ assert.equal(c.parseTechnicalRequirement('0.5 in',standard).upperTolerance,'');
+});
+
+test('ASME precision table and measurement field evidence survive project normalization',()=>{
+ const c=hostContext(),standard='ASME Y14.5-2018';
+ c.state.generalTolerance={standard,unit:'in',lower:'',upper:'',precisionRules:{1:'0.03',2:'0.01',3:'0.005',angle:'0.5'}};
+ for(const [text,tol]of [['1.2 in','0.03'],['1.20 in','0.01'],['1.200 in','0.005'],['45°','0.5']]){
+  const r=c.parseTechnicalRequirement(text,standard);assert.equal(r.upperTolerance,tol,text);assert.equal(r.measurementEvidence.fields.upperTolerance.source,'general_tolerance');
+ }
+ assert.equal(c.parseTechnicalRequirement('1 in',standard).upperTolerance,'');
+ assert.equal(c.parseTechnicalRequirement('1.20 mm',standard).upperTolerance,'');
+ assert.equal(c.parseTechnicalRequirement('1/8-27 NPT',standard).upperTolerance,'');
+ const limits=c.parseTechnicalRequirement('0.596 MAX 0.586 MIN',standard);
+ assert.equal(limits.measurementEvidence.fields.nominalValue.source,'calculated_from_limits');
+ const saved=c.normalizeAnnotation({...limits,id:'evidence',page:1,ocrText:'0.596 MAX 0.586 MIN'});
+ assert.equal(saved.measurementEvidence.rawText,'0.596 MAX 0.586 MIN');
+ const gdt=c.parseTechnicalRequirement('⌖ | Ø0.1 | A',standard);assert.equal(gdt.measurementEvidence,undefined);
+ const manual=c.window.ASMachRequirements.measurementEvidence({...limits,nominalValue:'0.592',nominalSource:'manual',manualFields:['nominalValue']},'source');
+ assert.equal(manual.measurementEvidence.fields.nominalValue.source,'manual');
 });
 
 test('Diameter prefix variants and OCR evidence preserve nominal and explicit deviations',()=>{

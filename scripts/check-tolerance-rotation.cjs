@@ -1,0 +1,44 @@
+'use strict';
+const {chromium}=require('C:/Users/gencg/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{pathToFileURL}=require('node:url');
+const out=path.resolve('outputs/tolerance-rotation-qa');fs.mkdirSync(out,{recursive:true});
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});try{
+ const p=await browser.newPage({viewport:{width:1500,height:950}}),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.route(/^https?:/,r=>r.abort());
+ await p.goto(pathToFileURL(path.resolve('ASMach_Teknik_Resim_Balonlama.html')).href);
+ await p.evaluate(async()=>{
+  const page=document.createElement('canvas');page.width=1400;page.height=900;const g=page.getContext('2d');g.fillStyle='white';g.fillRect(0,0,1400,900);g.fillStyle='blue';g.font='48px Arial';g.fillText('103',500,410);g.font='30px Arial';g.fillText('+0.05',620,385);g.fillText('0',620,425);g.strokeStyle='blue';g.beginPath();g.moveTo(370,440);g.lineTo(800,440);g.stroke();g.fillStyle='black';g.font='34px Arial';g.fillText('2',500,580);
+  const b=ASMachSnapshots.rotateBox({x:.35,y:.38,w:.18,h:.1},1400,900,-8);delete b.angleLocked;
+  const make=(id,text,box)=>({id,number:id==='skew'?1:2,page:1,selectionBox:box,ocrText:text,...ASMachApp.parseRequirement(text,'ISO 2768-mK'),snapshot:ASMachSnapshots._test.extract(page,ASMachSnapshots.boxRect(box,1400,900)).toDataURL(),anchorX:box.x,anchorY:box.y,bubbleX:box.x-.05,bubbleY:box.y,size:20,fontSize:10});
+  await ASMachApp.restoreProject({format:'asmach-ballooning-project',source:{name:'rotation-general-tolerance-test.png',type:'image/png',dataUrl:page.toDataURL()},generalTolerance:{standard:'ISO 2768-mK',unit:'mm'},annotations:[make('skew','103 (+0.05/0)',b),make('general','2',{x:.35,y:.59,w:.03,h:.06})]});
+  ASMachMessages.confirm=async()=>true;ASMachApp.state.selectedId='general';ASMachApp.renderAll();window.ocrCalls=0;ASMachApp.recognizeSnapshotAutomatically=async()=>{ocrCalls++;throw Error('Rotation must not invoke OCR');};
+ });
+ await p.locator('#characteristicType').selectOption('Pah');await p.waitForFunction(()=>ASMachApp.state.annotations.find(r=>r.id==='general').type==='Pah');
+ assert.equal(Number(await p.locator('#upperTolerance').inputValue()),.2);assert.match(await p.locator('#requirement').inputValue(),/0.2/);
+ await p.locator('#nominalValue').fill('5');await p.locator('#nominalValue').press('Tab');await p.waitForFunction(()=>ASMachApp.state.annotations.find(r=>r.id==='general').nominalValue==='5');assert.equal(Number(await p.locator('#upperTolerance').inputValue()),.5);
+ await p.evaluate(()=>{ASMachApp.state.selectedId='skew';ASMachApp.renderAll();});
+ if(await p.locator('#cwSourceToggle').getAttribute('aria-expanded')!=='true')await p.locator('#cwSourceToggle').click();
+ const slider=p.getByRole('slider',{name:'Ölçü kutusu dönüklüğü'});await slider.waitFor({timeout:10000}).catch(async e=>{console.log(await p.locator('.ci-source-editor').allTextContents(),errors);await p.screenshot({path:path.join(out,'failure.png')});throw e;});await p.waitForFunction(()=>!document.querySelector('.wf-source-rotation input').disabled);
+ assert.equal(Number(await slider.inputValue()),-8);const before=await p.evaluate(()=>JSON.parse(JSON.stringify(ASMachApp.selectedAnnotation())));
+ await slider.evaluate(n=>{n.value='0';n.dispatchEvent(new Event('input',{bubbles:true}));});
+ await p.waitForFunction(()=>ASMachApp.state.sourceRotationPreview?.box.rotation===0);
+ assert.equal(await p.evaluate(()=>ASMachApp.selectedAnnotation().selectionBox.rotation),-8,'Live preview must not commit');
+ const preview=await p.locator('.ocr-selection-outline').first().getAttribute('points');assert.ok(preview);
+ await slider.dispatchEvent('change');await p.waitForFunction(()=>ASMachApp.selectedAnnotation().selectionBox.rotation===0);await slider.waitFor();
+ const after=await p.evaluate(()=>JSON.parse(JSON.stringify(ASMachApp.selectedAnnotation())));
+ for(const k of ['nominalValue','lowerTolerance','upperTolerance','lowerLimit','upperLimit','requirement','ocrText','size','fontSize'])assert.equal(after[k],before[k],k);
+ assert.equal(after.selectionBox.angleLocked,true);assert.notEqual(after.snapshot,before.snapshot);assert.equal(await p.evaluate(()=>ocrCalls),0);assert.equal(after.selectionBox.points[0].y,after.selectionBox.points[1].y);
+ assert.equal(await p.evaluate(()=>ASMachApp.normalizeAnnotation(JSON.parse(JSON.stringify(ASMachApp.selectedAnnotation()))).selectionBox.angleLocked),true,'Project normalization preserves manual angle');
+ await p.screenshot({path:path.join(out,'rotation-slider.png')});
+ await slider.evaluate(n=>{n.value='12.5';n.dispatchEvent(new Event('input',{bubbles:true}));});await p.waitForFunction(()=>ASMachApp.state.sourceRotationPreview?.box.rotation===12.5);await slider.press('Escape');
+ assert.equal(await p.evaluate(()=>ASMachApp.state.sourceRotationPreview),null);assert.equal(await p.evaluate(()=>ASMachApp.selectedAnnotation().selectionBox.rotation),0);
+ await slider.focus();await slider.press('ArrowUp');await p.waitForFunction(()=>ASMachApp.selectedAnnotation().selectionBox.rotation===.1);await slider.waitFor();await p.waitForFunction(()=>document.activeElement===document.querySelector('.wf-source-rotation input'));
+ await slider.press('ArrowUp');await p.waitForFunction(()=>ASMachApp.selectedAnnotation().selectionBox.rotation===.2);await slider.waitFor();
+ await p.getByRole('button',{name:'Ölçü kutusunu yatay yap',exact:true}).click();await p.waitForFunction(()=>ASMachApp.selectedAnnotation().selectionBox.rotation===0);await slider.waitFor();
+ // A pending high-resolution recapture must not commit to a newly selected record.
+ await p.evaluate(()=>{const capture=ASMachApp.captureExact;window.originalCapture=capture;ASMachApp.captureExact=(...args)=>new Promise(resolve=>{window.releaseCapture=()=>capture(...args).then(resolve);});});
+ await slider.evaluate(n=>{n.value='15';n.dispatchEvent(new Event('change',{bubbles:true}));});await p.waitForFunction(()=>typeof releaseCapture==='function');
+ await p.evaluate(()=>{ASMachApp.captureExact=originalCapture;ASMachApp.state.selectedId='general';ASMachApp.renderAll();releaseCapture();});
+ await p.waitForFunction(()=>document.querySelector('.wf-source-rotation input')&&!document.querySelector('.wf-source-rotation input').disabled);
+ assert.equal(await p.evaluate(()=>ASMachApp.state.annotations.find(r=>r.id==='skew').selectionBox.rotation),0);assert.equal(await p.evaluate(()=>ASMachApp.state.sourceRotationPreview),null);assert.deepEqual(errors,[]);
+ const report={passed:true,checks:['type refresh','nominal refresh','explicit tolerance preserved','live rotation preview','zero OCR calls','page box / preview synchronization','project angle lock','cancel preview','keyboard fine adjustment and focus','stale capture safety'],errors};fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
